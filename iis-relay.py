@@ -35,6 +35,11 @@ from impacket.examples.ntlmrelayx.attacks import PROTOCOL_ATTACKS
 # Vendored modules (kernel auth, session picker, socket locking)
 from lib.relay.utils.config import NTLMRelayxConfig, parse_listening_ports
 from lib.relay.servers.socksserver import SOCKS
+from lib.relay.clients.httprelayclient import HTTPRelayClient, HTTPSRelayClient
+
+# Override with our vendored HTTP clients (kernel auth support)
+PROTOCOL_CLIENTS['HTTP'] = HTTPRelayClient
+PROTOCOL_CLIENTS['HTTPS'] = HTTPSRelayClient
 
 RELAY_SERVERS = []
 
