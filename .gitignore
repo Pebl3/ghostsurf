@@ -1,0 +1,25 @@
+# Virtual environment
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# IDE
+.vscode/
+.idea/
+
+# Logs and loot
+*.log
+loot/
+
+# Certificates
+*.crt
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
