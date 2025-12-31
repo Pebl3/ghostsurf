@@ -27,10 +27,15 @@ from lib.relay.clients.httprelayclient import HTTPRelayClient, HTTPSRelayClient
 from impacket.examples.ntlmrelayx.servers import SMBRelayServer, HTTPRelayServer, WCFRelayServer, RAWRelayServer, RPCRelayServer, WinRMRelayServer, WinRMSRelayServer
 
 # Patch relay server modules to use our vendored activeConnections queue
+# (SMB, HTTP, RAW, and WCF all use activeConnections for SOCKS registration)
 import impacket.examples.ntlmrelayx.servers.smbrelayserver as smb_module
 import impacket.examples.ntlmrelayx.servers.httprelayserver as http_module
+import impacket.examples.ntlmrelayx.servers.rawrelayserver as raw_module
+import impacket.examples.ntlmrelayx.servers.wcfrelayserver as wcf_module
 smb_module.activeConnections = activeConnections
 http_module.activeConnections = activeConnections
+raw_module.activeConnections = activeConnections
+wcf_module.activeConnections = activeConnections
 
 from impacket.examples.ntlmrelayx.utils.targetsutils import TargetsProcessor, TargetsFileWatcher
 
