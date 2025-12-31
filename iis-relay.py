@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # nxhttp - HTTP NTLM Relay Tool
 #
-# Catches NTLM auth from any source (SMB, HTTP, WCF, RPC, WinRM)
+# Catches NTLM auth from any source (SMB, HTTP, WCF, RAW)
 # Relays TO HTTP/HTTPS targets only
 # SOCKS proxy for interactive browser session hijacking
 #
@@ -24,7 +24,8 @@ from lib.relay.utils.config import NTLMRelayxConfig, parse_listening_ports
 from lib.relay.servers.socksserver import SOCKS, activeConnections
 from lib.relay.clients.httprelayclient import HTTPRelayClient, HTTPSRelayClient
 
-from impacket.examples.ntlmrelayx.servers import SMBRelayServer, HTTPRelayServer, WCFRelayServer, RAWRelayServer, RPCRelayServer, WinRMRelayServer, WinRMSRelayServer
+# Only servers that support SOCKS registration (RPC/WinRM don't, so skip them)
+from impacket.examples.ntlmrelayx.servers import SMBRelayServer, HTTPRelayServer, WCFRelayServer, RAWRelayServer
 
 # Patch relay server modules to use our vendored activeConnections queue
 # (SMB, HTTP, RAW, and WCF all use activeConnections for SOCKS registration)
@@ -134,8 +135,6 @@ def start_servers(options, threads):
             c.setListeningPort(options.wcf_port)
         elif server is RAWRelayServer:
             c.setListeningPort(options.raw_port)
-        elif server is RPCRelayServer:
-            c.setListeningPort(options.rpc_port)
 
         s = server(c)
         s.start()
@@ -173,8 +172,6 @@ if __name__ == '__main__':
     serversoptions.add_argument('--no-http-server', action='store_true', help='Disable HTTP server')
     serversoptions.add_argument('--no-wcf-server', action='store_true', help='Disable WCF server')
     serversoptions.add_argument('--no-raw-server', action='store_true', help='Disable RAW server')
-    serversoptions.add_argument('--no-rpc-server', action='store_true', help='Disable RPC server')
-    serversoptions.add_argument('--no-winrm-server', action='store_true', help='Disable WinRM server')
 
     # Server ports
     portoptions = parser.add_argument_group("Server ports")
@@ -183,7 +180,6 @@ if __name__ == '__main__':
                              help='HTTP server port(s), comma-separated or range (default: 80)')
     portoptions.add_argument('--wcf-port', type=int, default=9389, help='WCF server port (default: 9389)')
     portoptions.add_argument('--raw-port', type=int, default=6666, help='RAW server port (default: 6666)')
-    portoptions.add_argument('--rpc-port', type=int, default=135, help='RPC server port (default: 135)')
 
     # SOCKS proxy options
     socksoptions = parser.add_argument_group("SOCKS proxy (browser hijacking)")
@@ -243,11 +239,6 @@ if __name__ == '__main__':
         RELAY_SERVERS.append(WCFRelayServer)
     if not options.no_raw_server:
         RELAY_SERVERS.append(RAWRelayServer)
-    if not options.no_winrm_server:
-        RELAY_SERVERS.append(WinRMRelayServer)
-        RELAY_SERVERS.append(WinRMSRelayServer)
-    if not options.no_rpc_server:
-        RELAY_SERVERS.append(RPCRelayServer)
 
     # Watch targets file if requested
     if options.tf and options.w:
