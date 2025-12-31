@@ -1,6 +1,6 @@
 # Impacket - Collection of Python classes for working with network protocols.
 #
-# Copyright Fortra, LLC and its affiliated companies 
+# Copyright Fortra, LLC and its affiliated companies
 #
 # All rights reserved.
 #
@@ -15,7 +15,8 @@
 #   command line, this can be passed to the tools' servers and clients
 #
 # Author:
-#  Dirk-jan Mollema / Fox-IT (https://www.fox-it.com)
+#   Dirk-jan Mollema / Fox-IT (https://www.fox-it.com)
+#   senderend - kernelAuth config option for IIS workaround
 #
 from impacket.examples.utils import parse_credentials
 
@@ -90,6 +91,7 @@ class NTLMRelayxConfig:
 
         # HTTP options
         self.remove_target = False
+        # IIS kernel mode auth workaround - probe paths anonymously before using auth
         self.kernelAuth = False
 
         # WebDAV options

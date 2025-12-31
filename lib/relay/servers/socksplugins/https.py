@@ -1,6 +1,6 @@
 # Impacket - Collection of Python classes for working with network protocols.
 #
-# Copyright Fortra, LLC and its affiliated companies 
+# Copyright Fortra, LLC and its affiliated companies
 #
 # All rights reserved.
 #
@@ -14,7 +14,8 @@
 #   A simple SOCKS server that proxies a connection to relayed HTTPS connections
 #
 # Author:
-#  Dirk-jan Mollema (@_dirkjan) / Fox-IT (https://www.fox-it.com)
+#   Dirk-jan Mollema (@_dirkjan) / Fox-IT (https://www.fox-it.com)
+#   senderend - inherits kernel auth workaround from http.py
 #
 from impacket import LOG
 from lib.relay.servers.socksplugins.http import HTTPSocksRelay

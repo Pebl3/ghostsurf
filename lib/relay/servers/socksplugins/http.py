@@ -1,6 +1,6 @@
 # Impacket - Collection of Python classes for working with network protocols.
 #
-# Copyright Fortra, LLC and its affiliated companies 
+# Copyright Fortra, LLC and its affiliated companies
 #
 # All rights reserved.
 #
@@ -15,6 +15,7 @@
 #
 # Author:
 #   Dirk-jan Mollema (@_dirkjan) / Fox-IT (https://www.fox-it.com)
+#   senderend - IIS kernel mode auth workaround, thread-safe socket locking
 #
 import base64
 
@@ -215,7 +216,8 @@ class HTTPSocksRelay(SocksRelay):
         # (contained in the session), which contains the socket
         self.relaySocket = self.session.sock
 
-        # Get the socket lock to prevent concurrent access from multiple threads
+        # Browsers open multiple connections in parallel, but we only have one relay
+        # socket. Lock it so requests don't stomp on each other.
         try:
             socketLock = self.activeRelays[self.username]['socketLock']
         except KeyError:
@@ -507,7 +509,11 @@ class HTTPSocksRelay(SocksRelay):
         return None
 
     def shouldProbeAnonymous(self):
-        """Check if kernel auth mode is enabled and we have access to probe"""
+        """
+        IIS with kernel mode auth (HTTP.sys) will reset our authenticated session if we
+        send NTLM auth on a resource that doesn't require it. So we probe anonymously
+        first to check if the path actually needs auth before using our relay session.
+        """
         LOG.info('HTTP: [DIAGNOSTIC] shouldProbeAnonymous: username=%s' % self.username)
         if not self.username:
             LOG.info('HTTP: [DIAGNOSTIC] shouldProbeAnonymous: No username, returning False')

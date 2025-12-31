@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # Impacket - Collection of Python classes for working with network protocols.
 #
-# Copyright Fortra, LLC and its affiliated companies 
+# Copyright Fortra, LLC and its affiliated companies
 #
 # All rights reserved.
 #
@@ -16,6 +16,7 @@
 #
 # Author:
 #   Alberto Solino (@agsolino)
+#   senderend - session picker UI for browser hijacking
 #
 # ToDo:
 #   [ ] Handle better the SOCKS specification (RFC1928), e.g. BIND
@@ -263,6 +264,7 @@ def activeConnectionsWatcher(server):
             client.killConnection()
 
 
+# REST API for listing active relays - used by the 'socks' command in the shell
 def webService(addr, port):
     def _webService(server):
         from flask import Flask, jsonify

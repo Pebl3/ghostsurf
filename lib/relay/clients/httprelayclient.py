@@ -1,6 +1,6 @@
 # Impacket - Collection of Python classes for working with network protocols.
 #
-# Copyright Fortra, LLC and its affiliated companies 
+# Copyright Fortra, LLC and its affiliated companies
 #
 # All rights reserved.
 #
@@ -15,6 +15,7 @@
 # Author:
 #   Dirk-jan Mollema / Fox-IT (https://www.fox-it.com)
 #   Alberto Solino (@agsolino)
+#   senderend - IIS kernel auth support, auth path caching
 #
 import re
 import ssl
@@ -37,8 +38,8 @@ PROTOCOL_CLIENT_CLASSES = ["HTTPRelayClient","HTTPSRelayClient"]
 class HTTPRelayClient(ProtocolClient):
     PLUGIN_NAME = "HTTP"
 
-    # Class-level cache: maps (host, port, path) -> requires_auth (True/False)
-    # Shared across all instances to remember which paths need authentication
+    # Cache which paths need auth so we don't hammer the server with probes.
+    # Shared across all instances - once we know a path needs auth, we remember it.
     authCache = {}
 
     def __init__(self, serverConfig, target, targetPort = 80, extendedSecurity=True ):
