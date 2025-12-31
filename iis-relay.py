@@ -59,12 +59,14 @@ from lib.relay.utils.config import NTLMRelayxConfig, parse_listening_ports
 from lib.relay.servers.socksserver import SOCKS, activeConnections
 from lib.relay.clients.httprelayclient import HTTPRelayClient, HTTPSRelayClient
 
-# Patch public impacket to use our vendored activeConnections queue
-# This must happen BEFORE importing relay servers (they import activeConnections at load time)
-import impacket.examples.ntlmrelayx.servers.socksserver as public_socksserver
-public_socksserver.activeConnections = activeConnections
-
 from impacket.examples.ntlmrelayx.servers import SMBRelayServer, HTTPRelayServer, WCFRelayServer, RAWRelayServer, RPCRelayServer, WinRMRelayServer, WinRMSRelayServer
+
+# Patch all relay server modules to use our vendored activeConnections queue
+# Must be done AFTER importing (they already have references to the old queue)
+import impacket.examples.ntlmrelayx.servers.smbrelayserver as smb_module
+import impacket.examples.ntlmrelayx.servers.httprelayserver as http_module
+smb_module.activeConnections = activeConnections
+http_module.activeConnections = activeConnections
 from impacket.examples.ntlmrelayx.utils.targetsutils import TargetsProcessor, TargetsFileWatcher
 
 RELAY_SERVERS = []
