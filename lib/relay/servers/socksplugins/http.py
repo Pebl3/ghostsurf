@@ -142,24 +142,25 @@ class HTTPSocksRelay(SocksRelay):
                 clean_request = ('GET %s HTTP/1.1\r\nHost: %s\r\nConnection: Keep-Alive\r\n\r\n' % (original_path, self.targetHost)).encode()
 
                 # Send the request and get response, then inject Set-Cookie header
+                # IMPORTANT: Keep lock held for entire request-response cycle
                 try:
                     with socketLock:
                         self.relaySocket.send(clean_request)
                         response_data = self.relaySocket.recv(self.packetSize)
 
-                    if response_data:
-                        # Inject session cookie into response (session cookie = no Expires = clears on browser close)
-                        import urllib.parse
-                        cookie_value = urllib.parse.quote(self.username)
-                        set_cookie = ('Set-Cookie: %s=%s; Path=/; HttpOnly\r\n' % (
-                            HTTPSocksRelay.SESSION_COOKIE, cookie_value)).encode()
+                        if response_data:
+                            # Inject session cookie into response (session cookie = no Expires = clears on browser close)
+                            import urllib.parse
+                            cookie_value = urllib.parse.quote(self.username)
+                            set_cookie = ('Set-Cookie: %s=%s; Path=/; HttpOnly\r\n' % (
+                                HTTPSocksRelay.SESSION_COOKIE, cookie_value)).encode()
 
-                        # Insert Set-Cookie after first header line
-                        header_end = response_data.find(b'\r\n')
-                        if header_end != -1:
-                            response_data = response_data[:header_end+2] + set_cookie + response_data[header_end+2:]
+                            # Insert Set-Cookie after first header line
+                            header_end = response_data.find(b'\r\n')
+                            if header_end != -1:
+                                response_data = response_data[:header_end+2] + set_cookie + response_data[header_end+2:]
 
-                        self.transferResponse(initial_data=response_data)
+                            self.transferResponse(initial_data=response_data)
                     return True
                 except (ConnectionResetError, BrokenPipeError, OSError) as e:
                     LOG.error('HTTP: Failed to send request for session %s: %s' % (selected_session, str(e)))
