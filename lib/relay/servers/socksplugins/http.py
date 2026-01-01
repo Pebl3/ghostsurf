@@ -557,8 +557,11 @@ class HTTPSocksRelay(SocksRelay):
                 # Success - forward response with initial data we already read
                 LOG.debug('%s: Path %s OK anonymously (cached)' % (protocol, path))
                 authCache[cache_key] = False
+                # Save original relay socket, use anon for this response, then restore
+                original_relay = self.relaySocket
                 self.relaySocket = anonConn.sock
                 self.transferResponse(initial_data=initial_data)
+                self.relaySocket = original_relay
                 anonConn.close()
 
         except Exception as e:
