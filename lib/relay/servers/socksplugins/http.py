@@ -27,13 +27,11 @@ from lib.relay.servers.socksserver import SocksRelay
 PLUGIN_CLASS = "HTTPSocksRelay"
 EOL = b'\r\n'
 
-# === DEBUG FLAG: Set to True to enable verbose auth debugging ===
-# REMOVE THIS BLOCK AFTER DEBUGGING
-HTTP_AUTH_DEBUG = True
+# Debug flag for verbose request/response logging
+HTTP_AUTH_DEBUG = False
 def _dbg(msg):
     if HTTP_AUTH_DEBUG:
-        LOG.info('[HTTP-DBG] %s' % msg)
-# === END DEBUG FLAG ===
+        LOG.debug('[HTTP-DBG] %s' % msg)
 
 class HTTPSocksRelay(SocksRelay):
     PLUGIN_NAME = 'HTTP Socks Plugin'
@@ -87,7 +85,7 @@ class HTTPSocksRelay(SocksRelay):
         # Check if this is a session selection request
         try:
             request_line = data.split(EOL)[0].decode("ascii")
-            LOG.info('HTTP: [DIAGNOSTIC] skipAuthentication called for: %s' % request_line)
+            LOG.debug('HTTP: skipAuthentication called for: %s' % request_line)
         except (UnicodeDecodeError, IndexError):
             LOG.debug('HTTP: Invalid request format')
             return False
@@ -471,17 +469,15 @@ class HTTPSocksRelay(SocksRelay):
         send NTLM auth on a resource that doesn't require it. So we probe anonymously
         first to check if the path actually needs auth before using our relay session.
         """
-        LOG.info('HTTP: [DIAGNOSTIC] shouldProbeAnonymous: username=%s' % self.username)
+        LOG.debug('HTTP: shouldProbeAnonymous check for %s' % self.username)
         if not self.username:
-            LOG.info('HTTP: [DIAGNOSTIC] shouldProbeAnonymous: No username, returning False')
+            LOG.debug('HTTP: shouldProbeAnonymous: No username')
             return False
         if self.username not in self.activeRelays:
-            LOG.info('HTTP: [DIAGNOSTIC] shouldProbeAnonymous: Username not in activeRelays, returning False')
+            LOG.debug('HTTP: shouldProbeAnonymous: Username not in activeRelays')
             return False
         relayClient = self.activeRelays[self.username]['protocolClient']
-        kernel_auth_enabled = relayClient.serverConfig.kernelAuth
-        LOG.info('HTTP: [DIAGNOSTIC] shouldProbeAnonymous: kernelAuth=%s' % kernel_auth_enabled)
-        return kernel_auth_enabled
+        return relayClient.serverConfig.kernelAuth
 
     def _processRequestWithProbe(self, buffer, socketLock, protocol='HTTP'):
         """
@@ -647,7 +643,6 @@ class HTTPSocksRelay(SocksRelay):
 
         buffer = b''
         while True:
-            LOG.info('HTTP: [DIAGNOSTIC-TUNNEL] While loop iteration started')
             try:
                 data = self.socksSocket.recv(self.packetSize)
                 # If this returns with an empty string, it means the socket was closed
@@ -661,8 +656,6 @@ class HTTPSocksRelay(SocksRelay):
                 if b'\r\n\r\n' not in buffer:
                     # Keep reading
                     continue
-
-                LOG.info('HTTP: [DIAGNOSTIC-TUNNEL] Complete header block detected, buffer length: %d' % len(buffer))
 
                 # Check for WebSocket upgrade requests in tunnel mode
                 try:
