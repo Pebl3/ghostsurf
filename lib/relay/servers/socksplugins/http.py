@@ -37,6 +37,9 @@ class HTTPSocksRelay(SocksRelay):
     PLUGIN_NAME = 'HTTP Socks Plugin'
     PLUGIN_SCHEME = 'HTTP'
 
+    # Cookie name for session persistence (no Expires = session cookie = clears on browser close)
+    SESSION_COOKIE = 'ntlmrelay_session'
+
     def __init__(self, targetHost, targetPort, socksSocket, activeRelays):
         SocksRelay.__init__(self, targetHost, targetPort, socksSocket, activeRelays)
         self.packetSize = 8192
@@ -106,40 +109,63 @@ class HTTPSocksRelay(SocksRelay):
             path_with_params = request_line.split(' ')[1]  # GET /path?session=user HTTP/1.1
             original_path = path_with_params.split('?')[0]  # /path
             session_param = request_line.split('?session=')[1].split(' ')[0]
-            
+
             # URL decode
             import urllib.parse
             selected_session = urllib.parse.unquote(session_param).upper()
-            
+
             # Check if this session exists
             if selected_session in self.activeRelays:
                 self.username = selected_session
+
                 LOG.info('HTTP: Session selected via form: %s@%s(%s)' % (
                     self.username, self.targetHost, self.targetPort))
                 self.session = self.activeRelays[self.username]['protocolClient'].session
-                
+
                 # Point our socket to the sock attribute of HTTPConnection
                 self.relaySocket = self.session.sock
-                LOG.info('HTTP: Request for %s using relaySocket ID: %s' % (original_path, id(self.relaySocket)))
-                
+                LOG.debug('HTTP: Request for %s using relaySocket ID: %s' % (original_path, id(self.relaySocket)))
+
                 # Check if connection is still alive
                 if not self.isConnectionAlive():
                     LOG.error('HTTP: Relay connection is dead for session %s' % selected_session)
                     return False
-                    
+
+                # Get the socket lock for this session
+                try:
+                    socketLock = self.activeRelays[self.username]['socketLock']
+                except KeyError:
+                    LOG.error('HTTP: Socket lock not found for %s' % self.username)
+                    return False
+
                 # Create a clean request to the original path without the parameter
                 clean_request = ('GET %s HTTP/1.1\r\nHost: %s\r\nConnection: Keep-Alive\r\n\r\n' % (original_path, self.targetHost)).encode()
-                # Send the request to the server
+
+                # Send the request and get response, then inject Set-Cookie header
                 try:
-                    self.relaySocket.send(clean_request)
-                    # Send the response back to the client
-                    self.transferResponse()
+                    with socketLock:
+                        self.relaySocket.send(clean_request)
+                        response_data = self.relaySocket.recv(self.packetSize)
+
+                    if response_data:
+                        # Inject session cookie into response (session cookie = no Expires = clears on browser close)
+                        import urllib.parse
+                        cookie_value = urllib.parse.quote(self.username)
+                        set_cookie = ('Set-Cookie: %s=%s; Path=/; HttpOnly\r\n' % (
+                            HTTPSocksRelay.SESSION_COOKIE, cookie_value)).encode()
+
+                        # Insert Set-Cookie after first header line
+                        header_end = response_data.find(b'\r\n')
+                        if header_end != -1:
+                            response_data = response_data[:header_end+2] + set_cookie + response_data[header_end+2:]
+
+                        self.transferResponse(initial_data=response_data)
                     return True
                 except (ConnectionResetError, BrokenPipeError, OSError) as e:
                     LOG.error('HTTP: Failed to send request for session %s: %s' % (selected_session, str(e)))
                     return False
             else:
-                # Invalid session, show picker again  
+                # Invalid session, show picker again
                 LOG.error('HTTP: Invalid session selected: %s' % selected_session)
         
         # Get headers from data
@@ -204,10 +230,24 @@ class HTTPSocksRelay(SocksRelay):
                 # Point our socket to the sock attribute of HTTPConnection
                 self.relaySocket = self.session.sock
             else:
-                # Multiple sessions, show selection page
-                LOG.info('HTTP: Multiple sessions available, showing selection page')
-                self.showSessionSelection(available_users)
-                return False
+                # Multiple sessions available - check for session cookie
+                cookie_session = self.getSessionFromCookie(headerDict)
+
+                if cookie_session and cookie_session in available_users:
+                    # Use session from cookie
+                    self.username = cookie_session
+                    LOG.debug('HTTP: Using session from cookie: %s@%s(%s)' % (
+                        self.username, self.targetHost, self.targetPort))
+                    self.session = self.activeRelays[self.username]['protocolClient'].session
+                    self.relaySocket = self.session.sock
+                else:
+                    # No valid cookie, show selection page
+                    if cookie_session:
+                        LOG.debug('HTTP: Cookie session %s not available, showing picker' % cookie_session)
+                    else:
+                        LOG.info('HTTP: Multiple sessions available, showing selection page')
+                    self.showSessionSelection(available_users)
+                    return False
 
         # When we are here, we have a session
         # Point our socket to the sock attribute of HTTPConnection
@@ -302,6 +342,48 @@ class HTTPSocksRelay(SocksRelay):
                 # Skip headers with non-ASCII characters
                 continue
         return headerDict
+
+    def getSessionFromCookie(self, headerDict):
+        """Extract session username from our session cookie if present"""
+        cookie_header = headerDict.get('cookie', '')
+        if not cookie_header:
+            return None
+
+        import urllib.parse
+        # Parse cookies (format: "name1=value1; name2=value2")
+        for cookie in cookie_header.split(';'):
+            cookie = cookie.strip()
+            if '=' in cookie:
+                name, value = cookie.split('=', 1)
+                if name.strip() == HTTPSocksRelay.SESSION_COOKIE:
+                    return urllib.parse.unquote(value.strip()).upper()
+        return None
+
+    def _stripSessionCookie(self, cookie_header):
+        """Remove our session cookie from Cookie header, return cleaned header or None if empty"""
+        try:
+            # cookie_header is bytes like b'Cookie: name1=val1; name2=val2'
+            header_str = cookie_header.decode('utf-8', errors='replace')
+            if ':' not in header_str:
+                return cookie_header
+
+            prefix, cookies_str = header_str.split(':', 1)
+            cookies = []
+            for cookie in cookies_str.split(';'):
+                cookie = cookie.strip()
+                if '=' in cookie:
+                    name, _ = cookie.split('=', 1)
+                    if name.strip() == HTTPSocksRelay.SESSION_COOKIE:
+                        continue  # Skip our session cookie
+                if cookie:
+                    cookies.append(cookie)
+
+            if cookies:
+                return ('%s: %s' % (prefix, '; '.join(cookies))).encode('utf-8')
+            else:
+                return None  # All cookies were ours, strip the header entirely
+        except:
+            return cookie_header  # On error, pass through unchanged
 
     def transferResponse(self, initial_data=None):
         try:
@@ -593,10 +675,15 @@ class HTTPSocksRelay(SocksRelay):
             if b'connection: close' in part.lower():
                 response.append(b'Connection: Keep-Alive')
                 continue
-            # === DEBUG: Log cookie ===
-            if b'cookie' in part.lower():
-                _dbg('>>> Cookie: %s' % part.decode('utf-8', errors='replace'))
-            # === END DEBUG ===
+            # Strip our session cookie from Cookie header before forwarding to target
+            if part.lower().startswith(b'cookie:'):
+                cleaned_cookie = self._stripSessionCookie(part)
+                if cleaned_cookie:
+                    response.append(cleaned_cookie)
+                    _dbg('>>> Cookie (cleaned): %s' % cleaned_cookie.decode('utf-8', errors='replace'))
+                else:
+                    _dbg('>>> Cookie stripped entirely (only had our session cookie)')
+                continue
             # If we are here it means we want to keep the header
             response.append(part)
         # Append the body
