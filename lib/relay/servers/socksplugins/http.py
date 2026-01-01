@@ -305,9 +305,12 @@ class HTTPSocksRelay(SocksRelay):
                 continue
         return headerDict
 
-    def transferResponse(self):
+    def transferResponse(self, initial_data=None):
         try:
-            data = self.relaySocket.recv(self.packetSize)
+            if initial_data:
+                data = initial_data
+            else:
+                data = self.relaySocket.recv(self.packetSize)
             if not data:
                 LOG.debug('HTTP: No data received from relay socket - connection may be closed')
                 return
@@ -485,11 +488,6 @@ class HTTPSocksRelay(SocksRelay):
         Process request with try-anonymous-first, fallback-to-auth strategy.
         Tries sending request through anonymous connection first. If we get 401,
         fallback to authenticated relay for NTLM. Caches results per path.
-
-        Args:
-            buffer: Request data (includes cookies from browser)
-            socketLock: Threading lock for socket access
-            protocol: Protocol name for logging ('HTTP' or 'HTTPS')
         """
         if not self.shouldProbeAnonymous():
             # Kernel auth mode not enabled, use authenticated relay normally
@@ -501,102 +499,70 @@ class HTTPSocksRelay(SocksRelay):
 
         relayClient = self.activeRelays[self.username]['protocolClient']
         path = self.extractRequestPath(buffer)
+        tosend = self.prepareRequest(buffer)
 
-        # Check cache - skip anon attempt if we know this path needs auth
+        # Cache lookup
         path_without_query = path.split('?')[0] if path and '?' in path else path
         cache_key = (relayClient.targetHost, relayClient.targetPort, path_without_query)
         authCache = type(relayClient).authCache
 
         if cache_key in authCache and authCache[cache_key]:
-            # Cached as needs auth - go straight to authenticated relay
-            LOG.debug('%s: Cache hit for %s - requires auth, skipping anon probe' % (protocol, path))
+            # Cached as needs auth - use authenticated relay directly
+            LOG.debug('%s: Cache HIT (auth) %s' % (protocol, path))
             with socketLock:
-                tosend = self.prepareRequest(buffer)
                 self.relaySocket.send(tosend)
                 self.transferResponse()
             return
 
-        # Try anonymous connection first (with cookies from browser request)
-        # Create fresh connection for each request to avoid socket state issues
+        # Try anonymous connection
         try:
             import ssl
-            try:
-                from http.client import HTTPSConnection
-            except ImportError:
-                from httplib import HTTPSConnection
-
-            try:
-                uv_context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
-                anonConn = HTTPSConnection(relayClient.targetHost, relayClient.targetPort, context=uv_context)
-            except AttributeError:
-                anonConn = HTTPSConnection(relayClient.targetHost, relayClient.targetPort)
-
-            # Establish connection
+            from http.client import HTTPSConnection
+            uv_context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+            anonConn = HTTPSConnection(relayClient.targetHost, relayClient.targetPort, context=uv_context)
             anonConn.connect()
         except Exception as e:
-            LOG.error('%s: Failed to establish anonymous connection: %s' % (protocol, str(e)))
-            # Fallback to authenticated relay
+            LOG.error('%s: Anon connection failed: %s, using auth relay' % (protocol, str(e)))
             with socketLock:
-                tosend = self.prepareRequest(buffer)
                 self.relaySocket.send(tosend)
                 self.transferResponse()
             return
 
-        # Send browser request (with cookies) through anonymous connection
-        tosend = self.prepareRequest(buffer)
-        path = self.extractRequestPath(buffer)
-
         try:
+            # Send request through anonymous connection
             anonConn.sock.send(tosend)
 
-            # Read response status to check if NTLM auth required
-            response_data = anonConn.sock.recv(self.packetSize)
+            # Read initial response to check for 401
+            initial_data = anonConn.sock.recv(self.packetSize)
 
-            if not response_data:
-                LOG.debug('%s: No response from anonymous connection' % protocol)
-                # Fallback to authenticated relay
+            if not initial_data:
+                LOG.debug('%s: No response from anon connection' % protocol)
                 anonConn.close()
                 with socketLock:
                     self.relaySocket.send(tosend)
                     self.transferResponse()
                 return
 
-            # Check response status
-            status_line = response_data.split(b'\r\n')[0].decode('utf-8', errors='replace')
-
-            if '401' in status_line and b'WWW-Authenticate' in response_data:
-                # Got 401 with auth challenge - path requires NTLM
-                LOG.info('%s: Path %s requires NTLM auth, caching and retrying through authenticated relay' % (protocol, path))
-                authCache[cache_key] = True  # Cache: this path needs auth
-
-                # Close anonymous connection
+            # Decision: is it a 401?
+            if b'401' in initial_data[:50] and b'WWW-Authenticate' in initial_data:
+                # Needs auth - close anon, retry through auth relay
+                LOG.info('%s: Path %s requires auth (cached)' % (protocol, path))
+                authCache[cache_key] = True
                 anonConn.close()
 
                 with socketLock:
                     self.relaySocket.send(tosend)
                     self.transferResponse()
             else:
-                # Success! Path works with just cookies
-                LOG.info('%s: Path %s succeeded anonymously (cached as no-auth)' % (protocol, path))
-                authCache[cache_key] = False  # Cache: this path works without auth
-
-                # Forward the response we already received to client
-                self.socksSocket.send(response_data)
-
-                # Continue forwarding rest of response if needed
-                # (Response might be larger than initial buffer)
+                # Success - forward response with initial data we already read
+                LOG.debug('%s: Path %s OK anonymously (cached)' % (protocol, path))
+                authCache[cache_key] = False
                 self.relaySocket = anonConn.sock
-                while True:
-                    more_data = anonConn.sock.recv(self.packetSize)
-                    if not more_data:
-                        break
-                    self.socksSocket.send(more_data)
-
-                # Close after successful use
+                self.transferResponse(initial_data=initial_data)
                 anonConn.close()
 
         except Exception as e:
-            LOG.debug('%s: Anonymous connection error: %s, falling back to authenticated relay' % (protocol, str(e)))
+            LOG.debug('%s: Anon error: %s, falling back to auth' % (protocol, str(e)))
             try:
                 anonConn.close()
             except:
