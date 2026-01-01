@@ -118,6 +118,7 @@ def start_servers(options, threads):
         c.setMode(mode)
         c.setIPv6(options.ipv6)
         c.setKernelAuth(options.kernel_auth)
+        c.setKeepRelaying(options.keep_relaying)
         c.setSMB2Support(options.smb2support)
         c.setInterfaceIp(options.interface_ip)
 
@@ -191,6 +192,8 @@ if __name__ == '__main__':
     relayoptions = parser.add_argument_group("HTTP relay options")
     relayoptions.add_argument('--kernel-auth', action='store_true',
                               help='IIS kernel mode auth workaround (probe anonymously first)')
+    relayoptions.add_argument('--keep-relaying', action='store_true',
+                              help='Keep relaying to same target after success (reload target list)')
     relayoptions.add_argument('-smb2support', action='store_true', default=False, help='SMB2 support for incoming connections')
     relayoptions.add_argument('-6', '--ipv6', action='store_true', help='Listen on IPv6 and IPv4')
 
@@ -256,9 +259,11 @@ if __name__ == '__main__':
     threads.add(socks_thread)
     logging.info("SOCKS proxy: %s:%d" % (options.socks_address, options.socks_port))
 
-    # Log kernel auth status
+    # Log options status
     if options.kernel_auth:
         logging.info("Kernel Auth workaround ENABLED")
+    if options.keep_relaying:
+        logging.info("Keep-relaying mode ENABLED (will reload targets after success)")
 
     # Start relay servers
     c = start_servers(options, threads)
