@@ -64,6 +64,9 @@ class HTTPRelayClient(ProtocolClient):
 
     def sendNegotiate(self,negotiateMessage):
         #Check if server wants auth
+        if self.session is None:
+            LOG.debug('HTTP: Session not initialized, skipping negotiate')
+            return False
         if self.query:
             self.session.request('GET', self.path + '?' + self.query)
         else:
