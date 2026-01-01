@@ -247,18 +247,8 @@ def activeConnectionsWatcher(server):
             # Let's store the protocol scheme, needed be used later when trying to find the right socks relay server to use
             server.activeRelays[target][port]['scheme'] = scheme
 
-            # Default values in case somebody asks while we're getting the data
+            # HTTP/HTTPS clients don't support admin checks
             server.activeRelays[target][port][userName]['isAdmin'] = 'N/A'
-            # Do we have admin access in this connection?
-            try:
-                LOG.debug("Checking admin status for user %s" % str(userName))
-                isAdmin = client.isAdmin()
-                server.activeRelays[target][port][userName]['isAdmin'] = isAdmin
-            except Exception as e:
-                # Method not implemented
-                server.activeRelays[target][port][userName]['isAdmin'] = 'N/A'
-                pass
-            LOG.debug("isAdmin returned: %s" % server.activeRelays[target][port][userName]['isAdmin'])
         else:
             LOG.info('Relay connection for %s at %s(%d) already exists. Discarding' % (userName, target, port))
             client.killConnection()

@@ -119,7 +119,7 @@ def start_servers(options, threads):
         c.setIPv6(options.ipv6)
         c.setKernelAuth(options.kernel_auth)
         c.setKeepRelaying(options.keep_relaying)
-        c.setSMB2Support(options.smb2support)
+        c.setSMB2Support(not options.smb1)
         c.setInterfaceIp(options.interface_ip)
 
         if server is HTTPRelayServer:
@@ -154,13 +154,13 @@ if __name__ == '__main__':
 
     # Main arguments
     parser.add_argument("-h", "--help", action="help", help='show this help message and exit')
-    parser.add_argument('-ts', action='store_true', help='Adds timestamp to every logging output')
-    parser.add_argument('-debug', action='store_true', help='Turn DEBUG output ON')
-    parser.add_argument('-t', "--target", action='store', metavar='TARGET', required=True,
+    parser.add_argument('-s', '--ts', action='store_true', help='Adds timestamp to every logging output')
+    parser.add_argument('-d', '--debug', action='store_true', help='Turn DEBUG output ON')
+    parser.add_argument('-t', '--target', action='store', metavar='TARGET', required=True,
                         help="Target HTTP(S) URL to relay to (e.g. https://target.domain/)")
-    parser.add_argument('-tf', action='store', metavar='TARGETSFILE',
+    parser.add_argument('-f', '--targets-file', action='store', metavar='TARGETSFILE',
                         help='File containing target URLs, one per line')
-    parser.add_argument('-w', action='store_true',
+    parser.add_argument('-w', '--watch', action='store_true',
                         help='Watch target file for changes and update automatically')
 
     # Interface
@@ -184,9 +184,9 @@ if __name__ == '__main__':
 
     # SOCKS proxy options
     socksoptions = parser.add_argument_group("SOCKS proxy (browser hijacking)")
-    socksoptions.add_argument('-socks-address', default='127.0.0.1', help='SOCKS5 bind address (default: 127.0.0.1)')
-    socksoptions.add_argument('-socks-port', type=int, default=1080, help='SOCKS5 port (default: 1080)')
-    socksoptions.add_argument('-http-api-port', type=int, default=9090, help='HTTP API port (default: 9090)')
+    socksoptions.add_argument('--socks-address', default='127.0.0.1', help='SOCKS5 bind address (default: 127.0.0.1)')
+    socksoptions.add_argument('--socks-port', type=int, default=1080, help='SOCKS5 port (default: 1080)')
+    socksoptions.add_argument('--api-port', type=int, default=9090, help='HTTP API port (default: 9090)')
 
     # HTTP relay options
     relayoptions = parser.add_argument_group("HTTP relay options")
@@ -194,7 +194,7 @@ if __name__ == '__main__':
                               help='IIS kernel mode auth workaround (probe anonymously first)')
     relayoptions.add_argument('--keep-relaying', action='store_true',
                               help='Keep relaying to same target after success (reload target list)')
-    relayoptions.add_argument('-smb2support', action='store_true', default=False, help='SMB2 support for incoming connections')
+    relayoptions.add_argument('--smb1', action='store_true', help='Use SMB1 only for incoming connections (SMB2 is default)')
     relayoptions.add_argument('-6', '--ipv6', action='store_true', help='Listen on IPv6 and IPv4')
 
     try:
@@ -220,12 +220,12 @@ if __name__ == '__main__':
         logging.info("Target: %s" % options.target)
         mode = 'RELAY'
         targetSystem = TargetsProcessor(singleTarget=options.target, protocolClients=PROTOCOL_CLIENTS)
-    elif options.tf is not None:
-        logging.info("Targets from file: %s" % options.tf)
-        targetSystem = TargetsProcessor(targetListFile=options.tf, protocolClients=PROTOCOL_CLIENTS)
+    elif options.targets_file is not None:
+        logging.info("Targets from file: %s" % options.targets_file)
+        targetSystem = TargetsProcessor(targetListFile=options.targets_file, protocolClients=PROTOCOL_CLIENTS)
         mode = 'RELAY'
     else:
-        logging.error("No target specified. Use -t or -tf")
+        logging.error("No target specified. Use -t or --targets-file")
         sys.exit(1)
 
     # Set up relay servers
@@ -244,14 +244,14 @@ if __name__ == '__main__':
         RELAY_SERVERS.append(RAWRelayServer)
 
     # Watch targets file if requested
-    if options.tf and options.w:
+    if options.targets_file and options.watch:
         watchthread = TargetsFileWatcher(targetSystem)
         watchthread.start()
 
     threads = set()
 
     # Start SOCKS proxy (always on)
-    socksServer = SOCKS(server_address=(options.socks_address, options.socks_port), api_port=options.http_api_port)
+    socksServer = SOCKS(server_address=(options.socks_address, options.socks_port), api_port=options.api_port)
     socksServer.daemon_threads = True
     socks_thread = Thread(target=socksServer.serve_forever)
     socks_thread.daemon = True
@@ -272,7 +272,7 @@ if __name__ == '__main__':
     logging.info("Servers started, waiting for connections")
 
     try:
-        shell = MiniShell(c, threads, api_address='{}:{}'.format(options.socks_address, options.http_api_port))
+        shell = MiniShell(c, threads, api_address='{}:{}'.format(options.socks_address, options.api_port))
         shell.cmdloop()
     except KeyboardInterrupt:
         pass
