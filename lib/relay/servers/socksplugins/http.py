@@ -138,8 +138,11 @@ class HTTPSocksRelay(SocksRelay):
                     LOG.error('HTTP: Socket lock not found for %s' % self.username)
                     return False
 
-                # Create a clean request to the original path without the parameter
-                clean_request = ('GET %s HTTP/1.1\r\nHost: %s\r\nConnection: Keep-Alive\r\n\r\n' % (original_path, self.targetHost)).encode()
+                # Remove ?session= from request line but keep all other headers/body
+                # Replace "GET /path?session=XXX HTTP" with "GET /path HTTP"
+                old_line = request_line.encode()
+                new_line = old_line.replace(b'?session=' + session_param.encode(), b'')
+                clean_request = self.prepareRequest(data.replace(old_line, new_line, 1))
 
                 # Send the request and get response, then inject Set-Cookie header
                 # IMPORTANT: Keep lock held for entire request-response cycle
