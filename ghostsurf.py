@@ -1,11 +1,12 @@
 #!/usr/bin/env python
-# nxhttp - HTTP NTLM Relay Tool
+# ghostsurf - NTLM Relay Browser Hijacking Tool
 #
-# Catches NTLM auth from any source (SMB, HTTP, WCF, RAW)
-# Relays TO HTTP/HTTPS targets only
-# SOCKS proxy for interactive browser session hijacking
+# Captures NTLM auth from any source (SMB, HTTP, WCF, RAW)
+# Relays to HTTP/HTTPS targets
+# SOCKS proxy for browser session impersonation
 #
-# Based on impacket's ntlmrelayx with kernel mode auth support
+# Based on ntlmrelayx.py from Impacket
+# Features kernel-mode auth workaround for IIS/HTTP.sys targets
 #
 
 import argparse
@@ -19,7 +20,7 @@ from threading import Thread
 
 from impacket.examples import logger
 
-# Vendored modules with kernel auth support
+# Vendored relay modules with kernel-mode auth support
 from lib.relay.utils.config import NTLMRelayxConfig, parse_listening_ports
 from lib.relay.servers.socksserver import SOCKS, activeConnections
 from lib.relay.clients.httprelayclient import HTTPRelayClient, HTTPSRelayClient
@@ -43,19 +44,18 @@ from impacket.examples.ntlmrelayx.utils.targetsutils import TargetsProcessor, Ta
 RELAY_SERVERS = []
 
 BANNER = """
-    _  ___  _____ _____ ____
-   / |/ / |/_/ // /_  __/ __/
-  /    />  </ _  / / / / _/
- /_/|_/_/|_/_//_/ /_/ /_/
-
- HTTP NTLM Relay + Browser Session Hijacking
+        __               __                 ___
+  ___ _/ /  ___  ___ ___/ /______ ________/ _/
+ / _ `/ _ \\/ _ \\(_-</ _  / __/ _ `/ __/ _  _/
+ \\_, /_//_/\\___/___/\\_,_/_/  \\_,_/_/ /_//_/
+/___/       NTLM over HTTP browser session hijacking
 """
 
 
 class MiniShell(cmd.Cmd):
     def __init__(self, relayConfig, threads, api_address):
         cmd.Cmd.__init__(self)
-        self.prompt = 'nxhttp> '
+        self.prompt = 'ghostsurf> '
         self.api_address = api_address
         self.relayConfig = relayConfig
         self.intro = 'Type help for list of commands'
@@ -156,7 +156,7 @@ if __name__ == '__main__':
     parser.add_argument("-h", "--help", action="help", help='show this help message and exit')
     parser.add_argument('-s', '--ts', action='store_true', help='Adds timestamp to every logging output')
     parser.add_argument('-d', '--debug', action='store_true', help='Turn DEBUG output ON')
-    parser.add_argument('-t', '--target', action='store', metavar='TARGET', required=True,
+    parser.add_argument('-t', '--target', action='store', metavar='TARGET',
                         help="Target HTTP(S) URL to relay to (e.g. https://target.domain/)")
     parser.add_argument('-f', '--targets-file', action='store', metavar='TARGETSFILE',
                         help='File containing target URLs, one per line')
@@ -191,7 +191,7 @@ if __name__ == '__main__':
     # HTTP relay options
     relayoptions = parser.add_argument_group("HTTP relay options")
     relayoptions.add_argument('-k', '--kernel-auth', action='store_true',
-                              help='IIS kernel mode auth workaround (probe anonymously first)')
+                              help='Kernel-mode auth workaround for IIS/HTTP.sys (probe paths anonymously first)')
     relayoptions.add_argument('-r', '--keep-relaying', action='store_true',
                               help='Keep relaying to same target after success (reload target list)')
     relayoptions.add_argument('--smb1', action='store_true', help='Use SMB1 only for incoming connections (SMB2 is default)')
@@ -261,7 +261,7 @@ if __name__ == '__main__':
 
     # Log options status
     if options.kernel_auth:
-        logging.info("Kernel Auth workaround ENABLED")
+        logging.info("Kernel-mode auth workaround ENABLED")
     if options.keep_relaying:
         logging.info("Keep-relaying mode ENABLED (will reload targets after success)")
 

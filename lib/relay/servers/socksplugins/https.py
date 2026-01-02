@@ -15,7 +15,7 @@
 #
 # Author:
 #   Dirk-jan Mollema (@_dirkjan) / Fox-IT (https://www.fox-it.com)
-#   senderend - inherits kernel auth workaround from http.py
+#   senderend - inherits kernel-mode auth workaround from http.py, thread-safe socket locking for browser req serialization
 #
 from impacket import LOG
 from lib.relay.servers.socksplugins.http import HTTPSocksRelay
@@ -85,7 +85,7 @@ class HTTPSSocksRelay(SSLServerMixin, HTTPSocksRelay):
                     # Continue with normal processing if header parsing fails
                     pass
 
-                # Process request with kernel auth probe logic (inherited from parent)
+                # Process request with kernel-mode auth probe logic (inherited from parent)
                 self._processRequestWithProbe(buffer, socketLock, protocol='HTTPS')
                 
                 # Reset buffer after processing a full request-response cycle

@@ -15,7 +15,7 @@
 # Author:
 #   Dirk-jan Mollema / Fox-IT (https://www.fox-it.com)
 #   Alberto Solino (@agsolino)
-#   senderend - IIS kernel auth support, auth path caching
+#   senderend - kernel-mode auth support, auth path caching
 #
 import re
 import ssl
@@ -49,7 +49,7 @@ class HTTPRelayClient(ProtocolClient):
         self.authenticateMessageBlob = None
         self.server = None
         self.authenticationMethod = None
-        self.anonSession = None  # Anonymous connection for kernel auth workaround
+        self.anonSession = None  # Anonymous connection for kernel-mode auth workaround
         self.anonLock = Lock()  # Lock for thread-safe anonymous connection access
 
     def initConnection(self):
@@ -165,7 +165,7 @@ class HTTPRelayClient(ProtocolClient):
             # Don't close/recreate session - NTLM auth is bound to the TCP connection
 
     def getAnonConnection(self):
-        """Get or create anonymous connection for kernel auth workaround"""
+        """Get or create anonymous connection for kernel-mode auth workaround"""
         if self.anonSession is None:
             LOG.debug('HTTP: Creating anonymous connection to %s:%s' % (self.targetHost, self.targetPort))
             self.anonSession = HTTPConnection(self.targetHost, self.targetPort)
@@ -234,7 +234,7 @@ class HTTPSRelayClient(HTTPRelayClient):
         return True
 
     def getAnonConnection(self):
-        """Get or create anonymous HTTPS connection for kernel auth workaround"""
+        """Get or create anonymous HTTPS connection for kernel-mode auth workaround"""
         if self.anonSession is None:
             LOG.debug('HTTPS: Creating anonymous connection to %s:%s' % (self.targetHost, self.targetPort))
             try:

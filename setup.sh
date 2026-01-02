@@ -1,12 +1,12 @@
 #!/bin/bash
-# IIS Kernel Auth Relay - Setup Script
+# ghostsurf - Setup Script
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="$SCRIPT_DIR/venv"
 
-echo "=== IIS Kernel Auth Relay Setup ==="
+echo "=== ghostsurf Setup ==="
 echo ""
 
 # Check Python version
@@ -37,8 +37,8 @@ echo ""
 echo "=== Setup Complete ==="
 echo ""
 echo "Usage:"
-echo "  ./run.sh -t https://target-iis-server/ -socks --kernel-auth"
+echo "  ./run.sh -t https://target/ -k"
 echo ""
 echo "Or activate the virtual environment manually:"
 echo "  source venv/bin/activate"
-echo "  python iis-relay.py -h"
+echo "  python ghostsurf.py -h"

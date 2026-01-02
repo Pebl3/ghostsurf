@@ -1,1 +1,1 @@
-# IIS Kernel Auth Relay - Vendored modules
+# ghostsurf - Vendored relay modules

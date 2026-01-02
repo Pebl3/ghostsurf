@@ -16,12 +16,7 @@
 #
 # Author:
 #   Alberto Solino (@agsolino)
-#   senderend - session picker UI for browser hijacking
-#
-# ToDo:
-#   [ ] Handle better the SOCKS specification (RFC1928), e.g. BIND
-#   [ ] Port handlers should be dynamically subscribed, and coded in another place. This will help coding
-#       proxies for different protocols (e.g. MSSQL)
+#   senderend - socket lock for keep-alive to avoid state corruption in multi-threaded use
 #
 from __future__ import division
 from __future__ import print_function

@@ -1,5 +1,5 @@
 #!/bin/bash
-# IIS Kernel Auth Relay - Run Script
+# ghostsurf - Run Script
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="$SCRIPT_DIR/venv"
@@ -10,4 +10,4 @@ if [ ! -d "$VENV_DIR" ]; then
 fi
 
 source "$VENV_DIR/bin/activate"
-python "$SCRIPT_DIR/iis-relay.py" "$@"
+python "$SCRIPT_DIR/ghostsurf.py" "$@"

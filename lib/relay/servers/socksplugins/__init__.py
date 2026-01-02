@@ -1,4 +1,4 @@
-# Vendored SOCKS plugins for IIS Kernel Auth Relay
+# Vendored SOCKS plugins for ghostsurf
 from lib.relay.servers.socksplugins.http import HTTPSocksRelay
 from lib.relay.servers.socksplugins.https import HTTPSSocksRelay
 

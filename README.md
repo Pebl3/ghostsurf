@@ -1,13 +1,16 @@
-# IIS Kernel Auth Relay
+# ghostsurf
 
-NTLM Relay tool specifically designed for attacking IIS servers with kernel mode authentication enabled (HTTP.sys).
+NTLM relay tool with SOCKS proxy for browser session hijacking.
+
+Capture NTLM auth, relay to HTTP/HTTPS targets, then browse as the victim through a SOCKS proxy.
 
 ## Features
 
-- **IIS Kernel Mode Auth Workaround**: Try-and-fallback approach that probes targets anonymously first to avoid resetting the NTLM auth context
-- **Session Picker HTML UI**: Interactive selection when multiple relayed sessions are available
-- **Thread-Safe Socket Locking**: Supports concurrent browser proxy sessions
-- **Keep-Alive Fixes**: Raw socket operations to preserve NTLM session binding
+- **Browser Session Hijacking**: SOCKS5 proxy lets you browse as the relayed user
+- **Session Picker UI**: HTML interface when multiple sessions available
+- **Kernel-Mode Auth Workaround**: Probe-first strategy for IIS/HTTP.sys targets
+- **Multi-Target Support**: Target file with watch mode for dynamic updates
+- **Thread-Safe**: Concurrent browser connections with socket locking
 
 ## Installation
 
@@ -15,56 +18,88 @@ NTLM Relay tool specifically designed for attacking IIS servers with kernel mode
 ./setup.sh
 ```
 
-This creates a virtual environment and installs impacket from PyPI.
-
 ## Usage
 
-Basic usage with SOCKS proxy and kernel auth:
-
 ```bash
-./run.sh -t https://target-iis-server/ -socks --kernel-auth
+# Basic - relay to target
+./run.sh -t https://target.local/
+
+# With kernel-mode auth workaround (for IIS/HTTP.sys)
+./run.sh -t https://target.local/ -k
+
+# Multiple targets from file
+./run.sh -f targets.txt -w
+
+# Debug mode
+./run.sh -t https://target.local/ -k -d
 ```
 
-### Key Options
+### CLI Options
 
-| Option | Description |
-|--------|-------------|
-| `-t TARGET` | Target URL to relay to |
-| `-socks` | Enable SOCKS proxy for relayed connections |
-| `--kernel-auth` | Enable IIS kernel mode auth workaround |
-| `-debug` | Verbose output |
+```
+Main:
+  -t, --target TARGET      Target URL to relay to
+  -f, --targets-file FILE  File with target URLs (one per line)
+  -w, --watch              Watch targets file for changes
+  -d, --debug              Verbose output
+  -s, --ts                 Timestamp logging
 
-### Example Attack Flow
+Relay:
+  -k, --kernel-auth        Kernel-mode auth workaround (probe anonymously first)
+  -r, --keep-relaying      Keep relaying after success (reload targets)
+  -i, --interface IP       Bind to specific interface
 
-1. Start the relay with kernel auth enabled:
+SOCKS:
+  --socks-address IP       SOCKS5 bind address (default: 127.0.0.1)
+  --socks-port PORT        SOCKS5 port (default: 1080)
+  --api-port PORT          REST API port (default: 9090)
+
+Servers:
+  --no-smb-server          Disable SMB capture server
+  --no-http-server         Disable HTTP capture server
+  --no-wcf-server          Disable WCF capture server
+  --no-raw-server          Disable RAW capture server
+  --smb1                   Use SMB1 only (SMB2 is default)
+```
+
+### Attack Flow
+
+1. Start ghostsurf:
    ```bash
-   ./run.sh -t https://iis.target.local/ -socks --kernel-auth -debug
+   ./run.sh -t https://target.local/ -k -d
    ```
 
-2. Configure browser to use SOCKS proxy at `127.0.0.1:1080`
+2. Configure browser SOCKS proxy: `127.0.0.1:1080`
 
-3. Trigger NTLM authentication (e.g., via coerced auth, phishing link)
+3. Trigger NTLM auth (coerced auth, phishing, etc.)
 
-4. When session is captured, browse to target through proxy
+4. Session captured → browse to target through proxy
 
-5. If multiple sessions available, session picker UI appears
+5. Multiple sessions? Session picker UI appears
 
-## How Kernel Auth Workaround Works
+### Shell Commands
 
-IIS with kernel mode authentication binds the NTLM context to the TCP connection at the kernel level (HTTP.sys). This means:
+```
+ghostsurf> socks      # List active sessions
+ghostsurf> targets    # List configured targets
+ghostsurf> exit       # Shutdown
+```
 
-1. Standard relay approaches fail because anonymous requests reset the auth context
-2. Our workaround probes the target path anonymously FIRST with a fresh connection
-3. If path requires auth (401), we use the relayed session on a separate connection
-4. If path is anonymous (200), we return the response directly
+## Kernel-Mode Auth Workaround
 
-This preserves the NTLM session for authenticated requests while still supporting anonymous endpoints.
+IIS with HTTP.sys binds NTLM auth to TCP connections at kernel level. Sending auth to paths that don't need it resets the session.
+
+**Solution**: Probe paths anonymously first:
+1. Fresh connection probes target path
+2. 401 response → use authenticated relay session
+3. 200 response → return anonymous response directly
+4. Results cached per path
+
+Enable with `-k` flag.
 
 ## Credits
 
-Based on [impacket](https://github.com/fortra/impacket) ntlmrelayx by:
+Based on [ntlmrelayx](https://github.com/fortra/impacket) from Impacket by:
 - Fortra, LLC
 - Dirk-jan Mollema / Fox-IT
 - Alberto Solino
-
-Kernel mode auth research and implementation by the tool author.

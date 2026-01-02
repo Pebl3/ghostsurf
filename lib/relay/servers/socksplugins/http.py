@@ -15,7 +15,7 @@
 #
 # Author:
 #   Dirk-jan Mollema (@_dirkjan) / Fox-IT (https://www.fox-it.com)
-#   senderend - IIS kernel mode auth workaround, thread-safe socket locking
+#   senderend - kernel-mode auth workaround, thread-safe socket locking, session picker UI for multi-relay
 #
 import base64
 
@@ -193,7 +193,7 @@ class HTTPSocksRelay(SocksRelay):
             # Check if we have a connection for the user
             if self.username in self.activeRelays:
                 # HTTP is stateless - disable inUse check to allow concurrent browser sessions
-                # IIS handles session persistence server-side via cookies
+                # Server handles session persistence via cookies
                 # if self.activeRelays[self.username]['inUse'] is True:
                 #     LOG.error('HTTP: Connection for %s@%s(%s) is being used at the moment!' % (
                 #         self.username, self.targetHost, self.targetPort))
@@ -551,9 +551,9 @@ class HTTPSocksRelay(SocksRelay):
 
     def shouldProbeAnonymous(self):
         """
-        IIS with kernel mode auth (HTTP.sys) will reset our authenticated session if we
-        send NTLM auth on a resource that doesn't require it. So we probe anonymously
-        first to check if the path actually needs auth before using our relay session.
+        Servers with kernel-mode auth (e.g. IIS/HTTP.sys) reset authenticated sessions if
+        NTLM auth is sent to resources that don't require it. Probe anonymously first to
+        check if the path actually needs auth before using our relay session.
         """
         LOG.debug('HTTP: shouldProbeAnonymous check for %s' % self.username)
         if not self.username:

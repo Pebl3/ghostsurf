@@ -16,7 +16,7 @@
 #
 # Author:
 #   Dirk-jan Mollema / Fox-IT (https://www.fox-it.com)
-#   senderend - kernelAuth config option for IIS workaround
+#   senderend - kernelAuth config option for kernel-mode auth workaround
 #
 from impacket.examples.utils import parse_credentials
 
@@ -91,7 +91,7 @@ class NTLMRelayxConfig:
 
         # HTTP options
         self.remove_target = False
-        # IIS kernel mode auth workaround - probe paths anonymously before using auth
+        # Kernel-mode auth workaround - probe paths anonymously before using auth
         self.kernelAuth = False
 
         # WebDAV options
