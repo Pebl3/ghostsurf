@@ -44,6 +44,12 @@ class NTLMRelayxConfig:
         self.kernelAuth = False
         self.isADCSAttack = False
 
+        # SMB server options (required by impacket's SMBRelayServer but unused for HTTP-only relay)
+        self.outputFile = None
+        self.dumpHashes = False
+        self.SMBServerChallenge = None
+        self.remove_mic = False
+
     def setSMB2Support(self, value):
         self.smb2support = value
 
