@@ -310,6 +310,9 @@ class SocksRequestHandler(socketserver.BaseRequestHandler):
         LOG.debug("SOCKS: New Connection from %s(%s)" % (self.__ip, self.__port))
 
         data = self.__connSocket.recv(8192)
+        if not data:
+            LOG.debug("SOCKS: Client closed connection immediately (empty greeting)")
+            return
         grettings = SOCKS5_GREETINGS_BACK(data)
         self.__socksVersion = grettings['VER']
 
@@ -317,6 +320,9 @@ class SocksRequestHandler(socketserver.BaseRequestHandler):
             # We need to answer back with a no authentication response. We're not dealing with auth for now
             self.__connSocket.sendall(SOCKS5_GREETINGS_BACK().getData())
             data = self.__connSocket.recv(8192)
+            if not data:
+                LOG.debug("SOCKS: Client closed connection immediately (empty request)")
+                return
             request = SOCKS5_REQUEST(data)
         else:
             # We're in version 4, we just received the request
