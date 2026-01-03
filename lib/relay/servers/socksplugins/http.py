@@ -124,6 +124,11 @@ class HTTPSocksRelay(SocksRelay):
 
                 # Point our socket to the sock attribute of HTTPConnection
                 self.relaySocket = self.session.sock
+
+                # Ensure socket is in blocking mode (no timeout) for long-running operations
+                if self.relaySocket:
+                    self.relaySocket.settimeout(None)
+
                 LOG.debug('HTTP: Request for %s using relaySocket ID: %s' % (original_path, id(self.relaySocket)))
 
                 # Check if connection is still alive
@@ -233,6 +238,10 @@ class HTTPSocksRelay(SocksRelay):
 
                 # Point our socket to the sock attribute of HTTPConnection
                 self.relaySocket = self.session.sock
+
+                # Ensure socket is in blocking mode (no timeout) for long-running operations
+                if self.relaySocket:
+                    self.relaySocket.settimeout(None)
             else:
                 # Multiple sessions available - check for session cookie
                 cookie_session = self.getSessionFromCookie(headerDict)
@@ -244,6 +253,10 @@ class HTTPSocksRelay(SocksRelay):
                         self.username, self.targetHost, self.targetPort))
                     self.session = self.activeRelays[self.username]['protocolClient'].session
                     self.relaySocket = self.session.sock
+
+                    # Ensure socket is in blocking mode (no timeout) for long-running operations
+                    if self.relaySocket:
+                        self.relaySocket.settimeout(None)
                 else:
                     # No valid cookie, show selection page
                     if cookie_session:
@@ -257,6 +270,10 @@ class HTTPSocksRelay(SocksRelay):
         # Point our socket to the sock attribute of HTTPConnection
         # (contained in the session), which contains the socket
         self.relaySocket = self.session.sock
+
+        # Ensure socket is in blocking mode (no timeout) for long-running operations
+        if self.relaySocket:
+            self.relaySocket.settimeout(None)
 
         # Browsers open multiple connections in parallel, but we only have one relay
         # socket. Lock it so requests don't stomp on each other.
