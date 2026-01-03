@@ -97,7 +97,7 @@ class HTTPSocksRelay(SocksRelay):
         headers = self.getHeaders(data)
         if headers.get('upgrade', '').lower() == 'websocket':
             LOG.debug('HTTP: WebSocket upgrade request detected - rejecting')
-            response = b'HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\nWebSocket not supported'
+            response = b'HTTP/1.1 501 Not Implemented\r\nConnection: close\r\n\r\nWebSocket not supported'
             try:
                 self.socksSocket.send(response)
             except:
@@ -753,7 +753,7 @@ class HTTPSocksRelay(SocksRelay):
                     headers = self.getHeaders(buffer)
                     if headers.get('upgrade', '').lower() == 'websocket':
                         LOG.debug('HTTP: WebSocket upgrade in tunnel - rejecting')
-                        response = b'HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\nWebSocket not supported'
+                        response = b'HTTP/1.1 501 Not Implemented\r\nConnection: close\r\n\r\nWebSocket not supported'
                         try:
                             self.socksSocket.send(response)
                         except:

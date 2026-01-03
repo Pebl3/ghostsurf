@@ -75,7 +75,7 @@ class HTTPSSocksRelay(SSLServerMixin, HTTPSocksRelay):
                     headers = self.getHeaders(buffer)
                     if headers.get('upgrade', '').lower() == 'websocket':
                         LOG.debug('HTTPS: WebSocket upgrade in tunnel - rejecting')
-                        response = b'HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\nWebSocket not supported'
+                        response = b'HTTP/1.1 501 Not Implemented\r\nConnection: close\r\n\r\nWebSocket not supported'
                         try:
                             self.socksSocket.send(response)
                         except:
