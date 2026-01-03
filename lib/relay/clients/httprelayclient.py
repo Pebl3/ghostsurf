@@ -53,7 +53,7 @@ class HTTPRelayClient(ProtocolClient):
         self.anonLock = Lock()  # Lock for thread-safe anonymous connection access
 
     def initConnection(self):
-        self.session = HTTPConnection(self.targetHost,self.targetPort)
+        self.session = HTTPConnection(self.targetHost, self.targetPort, timeout=None)
         self.lastresult = None
         if self.target.path == '':
             self.path = '/'
@@ -168,7 +168,7 @@ class HTTPRelayClient(ProtocolClient):
         """Get or create anonymous connection for kernel-mode auth workaround"""
         if self.anonSession is None:
             LOG.debug('HTTP: Creating anonymous connection to %s:%s' % (self.targetHost, self.targetPort))
-            self.anonSession = HTTPConnection(self.targetHost, self.targetPort)
+            self.anonSession = HTTPConnection(self.targetHost, self.targetPort, timeout=None)
         return self.anonSession
 
     def probePathAnonymous(self, path):
@@ -228,9 +228,9 @@ class HTTPSRelayClient(HTTPRelayClient):
         self.query = self.target.query
         try:
             uv_context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
-            self.session = HTTPSConnection(self.targetHost,self.targetPort, context=uv_context)
+            self.session = HTTPSConnection(self.targetHost, self.targetPort, timeout=None, context=uv_context)
         except AttributeError:
-            self.session = HTTPSConnection(self.targetHost,self.targetPort)
+            self.session = HTTPSConnection(self.targetHost, self.targetPort, timeout=None)
         return True
 
     def getAnonConnection(self):
@@ -239,7 +239,7 @@ class HTTPSRelayClient(HTTPRelayClient):
             LOG.debug('HTTPS: Creating anonymous connection to %s:%s' % (self.targetHost, self.targetPort))
             try:
                 uv_context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
-                self.anonSession = HTTPSConnection(self.targetHost, self.targetPort, context=uv_context)
+                self.anonSession = HTTPSConnection(self.targetHost, self.targetPort, timeout=None, context=uv_context)
             except AttributeError:
-                self.anonSession = HTTPSConnection(self.targetHost, self.targetPort)
+                self.anonSession = HTTPSConnection(self.targetHost, self.targetPort, timeout=None)
         return self.anonSession

@@ -484,6 +484,9 @@ class HTTPSocksRelay(SocksRelay):
                 self.socksSocket.send(data)
         except (ConnectionResetError, BrokenPipeError, OSError) as e:
             LOG.debug('HTTP: Socket error in transferResponse: %s' % str(e))
+            # Drain relay socket on timeout to prevent garbage in next request
+            if 'timed out' in str(e).lower() or 'timeout' in str(e).lower():
+                self._drainRelaySocket()
             # Don't re-raise, let the caller handle the connection cleanup
 
     def _drainRelaySocket(self):
@@ -576,6 +579,9 @@ class HTTPSocksRelay(SocksRelay):
                             datasize = int(body[:eol_pos], 16)
                     except (ValueError, ConnectionResetError, BrokenPipeError, OSError) as e:
                         LOG.debug('HTTP: Error reading chunk size: %s' % str(e))
+                        # Drain relay socket on timeout to prevent garbage in next request
+                        if 'timed out' in str(e).lower() or 'timeout' in str(e).lower():
+                            self._drainRelaySocket()
                         return
                 except Exception as e:
                     LOG.debug('HTTP: Error in chunked transfer loop: %s' % str(e))
