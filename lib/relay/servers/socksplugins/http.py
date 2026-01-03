@@ -469,13 +469,47 @@ class HTTPSocksRelay(SocksRelay):
             LOG.debug('HTTP: Socket error in transferResponse: %s' % str(e))
             # Don't re-raise, let the caller handle the connection cleanup
 
+    def _drainRelaySocket(self):
+        """
+        Drain remaining response data from relay socket after browser disconnect.
+        Prevents leftover data from corrupting subsequent requests on shared socket.
+        """
+        import socket
+        try:
+            # Set short timeout to prevent blocking indefinitely
+            original_timeout = self.relaySocket.gettimeout()
+            self.relaySocket.settimeout(2.0)
+
+            bytes_drained = 0
+            while bytes_drained < 65536:  # Safety limit: drain max 64KB
+                chunk = self.relaySocket.recv(self.packetSize)
+                if not chunk:
+                    break
+                bytes_drained += len(chunk)
+
+            if bytes_drained > 0:
+                LOG.debug('HTTP: Drained %d bytes from relay socket after browser disconnect' % bytes_drained)
+
+            # Restore original timeout
+            self.relaySocket.settimeout(original_timeout)
+
+        except socket.timeout:
+            LOG.debug('HTTP: Relay socket drain timeout (socket empty)')
+        except Exception as e:
+            LOG.debug('HTTP: Error draining relay socket: %s' % str(e))
+
     def transferChunked(self, data, _headers):
         try:
             headerSize = data.find(EOL+EOL)
             if headerSize == -1:
                 LOG.debug('HTTP: Invalid chunked response - no headers')
                 return
-            self.socksSocket.send(data[:headerSize + 4])
+            try:
+                self.socksSocket.send(data[:headerSize + 4])
+            except (ConnectionResetError, BrokenPipeError, OSError) as e:
+                LOG.debug('HTTP: Browser disconnected while sending headers: %s' % str(e))
+                self._drainRelaySocket()
+                return
             body = data[headerSize + 4:]
             if not body:
                 LOG.debug('HTTP: No body data for chunked response')
@@ -509,7 +543,8 @@ class HTTPSocksRelay(SocksRelay):
                             readSize += len(body)
                             self.socksSocket.send(body)
                         except (ConnectionResetError, BrokenPipeError, OSError) as e:
-                            LOG.debug('HTTP: Connection error during chunk read: %s' % str(e))
+                            LOG.debug('HTTP: Browser disconnected during chunk send: %s' % str(e))
+                            self._drainRelaySocket()
                             return
                     
                     try:
@@ -527,6 +562,9 @@ class HTTPSocksRelay(SocksRelay):
                         return
                 except Exception as e:
                     LOG.debug('HTTP: Error in chunked transfer loop: %s' % str(e))
+                    # If browser disconnected (EPIPE), drain relay socket to prevent garbage on next request
+                    if 'EPIPE' in str(e) or 'Broken pipe' in str(e):
+                        self._drainRelaySocket()
                     return
                     
             LOG.debug('Last chunk received - exiting chunked transfer')
