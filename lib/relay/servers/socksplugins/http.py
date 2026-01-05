@@ -58,21 +58,26 @@ class HTTPSocksRelay(SocksRelay):
         if not self.relaySocket or not self.session:
             return False
         try:
-            # For HTTPS connections, use simple socket check
-            from http.client import HTTPSConnection
-            if isinstance(self.session, HTTPSConnection):
-                return hasattr(self.session, 'sock') and self.session.sock is not None
-            else:
-                # Original logic for HTTP - try to peek at the socket without consuming data
-                import socket
-                self.relaySocket.settimeout(0.1)
-                self.relaySocket.recv(1, socket.MSG_PEEK)
-                self.relaySocket.settimeout(None)
-                return True
-        except (socket.timeout, socket.error, OSError):
-            return True  # Assume alive if we can't determine
-        except Exception:
+            import select
+            # Check if socket is readable or in exceptional state
+            # Before we send a request, socket should NOT be readable (no pending data)
+            # If readable with 0 timeout = server sent data or closed connection
+            readable, _, exceptional = select.select([self.relaySocket], [], [self.relaySocket], 0)
+            if self.relaySocket in exceptional:
+                LOG.debug('HTTP: isConnectionAlive - socket in exceptional state')
+                return False
+            if self.relaySocket in readable:
+                # Socket is readable - unexpected before we send a request
+                # This likely means server closed connection (EOF is readable)
+                LOG.debug('HTTP: isConnectionAlive - socket unexpectedly readable (server may have closed)')
+                return False
+            return True
+        except (OSError, socket.error) as e:
+            LOG.debug('HTTP: isConnectionAlive - connection dead: %s' % str(e))
             return False
+        except Exception as e:
+            LOG.debug('HTTP: isConnectionAlive exception: %s' % str(e))
+            return True  # Assume alive if we can't determine
 
     def skipAuthentication(self):
         # See if the user provided authentication
@@ -153,8 +158,13 @@ class HTTPSocksRelay(SocksRelay):
                 # IMPORTANT: Keep lock held for entire request-response cycle
                 try:
                     with socketLock:
-                        self.relaySocket.send(clean_request)
+                        LOG.debug('HTTP: Session select - acquired lock, sending %d bytes to relay' % len(clean_request))
+                        LOG.debug('HTTP: Session select - request starts with: %s' % clean_request[:200])
+                        bytes_sent = self.relaySocket.send(clean_request)
+                        LOG.debug('HTTP: Session select - sent %d bytes, waiting for response...' % bytes_sent)
+
                         response_data = self.relaySocket.recv(self.packetSize)
+                        LOG.debug('HTTP: Session select - recv returned %d bytes' % (len(response_data) if response_data else 0))
 
                         if response_data:
                             # Inject session cookie into response (session cookie = no Expires = clears on browser close)
