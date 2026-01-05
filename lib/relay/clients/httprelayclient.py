@@ -142,6 +142,7 @@ class HTTPRelayClient(ProtocolClient):
         # sockets, which would destroy the NTLM-authenticated session. Raw socket ops
         # will simply fail if the socket is dead - they won't auto-recreate anything.
         import threading
+        import socket
         thread_id = threading.current_thread().ident
 
         try:
@@ -154,10 +155,17 @@ class HTTPRelayClient(ProtocolClient):
 
             self.session.sock.send(head_request)
 
-            # Read response (just consume it to keep connection alive)
-            response_data = self.session.sock.recv(8192)
-            if not response_data:
-                LOG.debug('HTTP keepAlive: Thread %s - no data received (connection may be dead)' % thread_id)
+            # Read response with short timeout - don't block forever holding the socket lock
+            original_timeout = self.session.sock.gettimeout()
+            self.session.sock.settimeout(5.0)
+            try:
+                response_data = self.session.sock.recv(8192)
+                if not response_data:
+                    LOG.debug('HTTP keepAlive: Thread %s - no data received (connection may be dead)' % thread_id)
+            except socket.timeout:
+                LOG.debug('HTTP keepAlive: Thread %s - timeout waiting for response' % thread_id)
+            finally:
+                self.session.sock.settimeout(original_timeout)
 
         except Exception as e:
             LOG.debug('HTTP keepAlive: Thread %s - Exception occurred: %s' % (thread_id, str(e)))
