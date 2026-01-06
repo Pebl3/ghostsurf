@@ -158,10 +158,27 @@ class HTTPSocksRelay(SocksRelay):
                 # IMPORTANT: Keep lock held for entire request-response cycle
                 try:
                     with socketLock:
+                        # Debug: check socket state before send
+                        try:
+                            peer = self.relaySocket.getpeername()
+                            LOG.debug('HTTP: Session select - socket connected to %s:%s' % peer)
+                        except Exception as e:
+                            LOG.error('HTTP: Session select - socket not connected: %s' % e)
+                            return False
+
                         LOG.debug('HTTP: Session select - acquired lock, sending %d bytes to relay' % len(clean_request))
                         LOG.debug('HTTP: Session select - request starts with: %s' % clean_request[:200])
                         bytes_sent = self.relaySocket.send(clean_request)
                         LOG.debug('HTTP: Session select - sent %d bytes, waiting for response...' % bytes_sent)
+
+                        # Use select to check if data arrives within 10 seconds
+                        import select
+                        readable, _, _ = select.select([self.relaySocket], [], [], 10.0)
+                        if not readable:
+                            LOG.error('HTTP: Session select - no response from server after 10s (select timeout)')
+                            # Don't return False yet - try recv anyway to see what happens
+                        else:
+                            LOG.debug('HTTP: Session select - select says socket is readable')
 
                         response_data = self.relaySocket.recv(self.packetSize)
                         LOG.debug('HTTP: Session select - recv returned %d bytes' % (len(response_data) if response_data else 0))
