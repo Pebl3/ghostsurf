@@ -121,85 +121,31 @@ class HTTPSocksRelay(SocksRelay):
 
             # Check if this session exists
             if selected_session in self.activeRelays:
-                self.username = selected_session
-
                 LOG.info('HTTP: Session selected via form: %s@%s(%s)' % (
-                    self.username, self.targetHost, self.targetPort))
-                self.session = self.activeRelays[self.username]['protocolClient'].session
+                    selected_session, self.targetHost, self.targetPort))
 
-                # Point our socket to the sock attribute of HTTPConnection
-                self.relaySocket = self.session.sock
+                # Redirect with Set-Cookie instead of proxying the first request directly.
+                # The browser follows the redirect, the cookie auto-selects the session
+                # (via getSessionFromCookie), and the request flows through the normal
+                # auto-select → _processRequestWithProbe path.
+                cookie_value = urllib.parse.quote(selected_session)
+                set_cookie = 'Set-Cookie: %s=%s; Path=/; HttpOnly' % (
+                    HTTPSocksRelay.SESSION_COOKIE, cookie_value)
 
-                # Ensure socket is in blocking mode (no timeout) for long-running operations
-                if self.relaySocket:
-                    self.relaySocket.settimeout(None)
+                redirect = (
+                    'HTTP/1.1 302 Found\r\n'
+                    'Location: %s\r\n'
+                    '%s\r\n'
+                    'Content-Length: 0\r\n'
+                    'Connection: close\r\n'
+                    '\r\n' % (original_path, set_cookie)
+                ).encode()
 
-                LOG.debug('HTTP: Request for %s using relaySocket ID: %s' % (original_path, id(self.relaySocket)))
-
-                # Check if connection is still alive
-                if not self.isConnectionAlive():
-                    LOG.error('HTTP: Relay connection is dead for session %s' % selected_session)
-                    return False
-
-                # Get the socket lock for this session
                 try:
-                    socketLock = self.activeRelays[self.username]['socketLock']
-                except KeyError:
-                    LOG.error('HTTP: Socket lock not found for %s' % self.username)
-                    return False
-
-                # Remove ?session= from request line but keep all other headers/body
-                # Replace "GET /path?session=XXX HTTP" with "GET /path HTTP"
-                old_line = request_line.encode()
-                new_line = old_line.replace(b'?session=' + session_param.encode(), b'')
-                clean_request = self.prepareRequest(data.replace(old_line, new_line, 1))
-
-                # Send the request and get response, then inject Set-Cookie header
-                # IMPORTANT: Keep lock held for entire request-response cycle
-                try:
-                    with socketLock:
-                        # Debug: check socket state before send
-                        try:
-                            peer = self.relaySocket.getpeername()
-                            LOG.debug('HTTP: Session select - socket connected to %s:%s' % peer)
-                        except Exception as e:
-                            LOG.error('HTTP: Session select - socket not connected: %s' % e)
-                            return False
-
-                        LOG.debug('HTTP: Session select - acquired lock, sending %d bytes to relay' % len(clean_request))
-                        LOG.debug('HTTP: Session select - request starts with: %s' % clean_request[:200])
-                        bytes_sent = self.relaySocket.send(clean_request)
-                        LOG.debug('HTTP: Session select - sent %d bytes, waiting for response...' % bytes_sent)
-
-                        # Use select to check if data arrives within 10 seconds
-                        import select
-                        readable, _, _ = select.select([self.relaySocket], [], [], 10.0)
-                        if not readable:
-                            LOG.error('HTTP: Session select - no response from server after 10s (select timeout)')
-                            # Don't return False yet - try recv anyway to see what happens
-                        else:
-                            LOG.debug('HTTP: Session select - select says socket is readable')
-
-                        response_data = self.relaySocket.recv(self.packetSize)
-                        LOG.debug('HTTP: Session select - recv returned %d bytes' % (len(response_data) if response_data else 0))
-
-                        if response_data:
-                            # Inject session cookie into response (session cookie = no Expires = clears on browser close)
-                            import urllib.parse
-                            cookie_value = urllib.parse.quote(self.username)
-                            set_cookie = ('Set-Cookie: %s=%s; Path=/; HttpOnly\r\n' % (
-                                HTTPSocksRelay.SESSION_COOKIE, cookie_value)).encode()
-
-                            # Insert Set-Cookie after first header line
-                            header_end = response_data.find(b'\r\n')
-                            if header_end != -1:
-                                response_data = response_data[:header_end+2] + set_cookie + response_data[header_end+2:]
-
-                            self.transferResponse(initial_data=response_data)
-                    return True
+                    self.socksSocket.send(redirect)
                 except (ConnectionResetError, BrokenPipeError, OSError) as e:
-                    LOG.error('HTTP: Failed to send request for session %s: %s' % (selected_session, str(e)))
-                    return False
+                    LOG.debug('HTTP: Failed to send session redirect: %s' % str(e))
+                return False  # Close this SOCKS connection; browser follows redirect
             else:
                 # Invalid session, show picker again
                 LOG.error('HTTP: Invalid session selected: %s' % selected_session)
