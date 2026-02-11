@@ -12,27 +12,23 @@ Capture NTLM auth, relay to HTTP/HTTPS targets, then browse as the victim throug
 - **Multi-Target Support**: Target file with watch mode for dynamic updates
 - **Thread-Safe**: Concurrent browser connections with socket locking
 
-## Installation
-
-```bash
-./setup.sh
-```
-
 ## Usage
 
 ```bash
 # Basic - relay to target
-./run.sh -t https://target.local/
+./ghostsurf -t https://target.local/
 
 # With kernel-mode auth workaround (for IIS/HTTP.sys)
-./run.sh -t https://target.local/ -k
+./ghostsurf -t https://target.local/ -k
 
 # Multiple targets from file
-./run.sh -f targets.txt -w
+./ghostsurf -f targets.txt -w
 
-# Debug mode
-./run.sh -t https://target.local/ -k -d
+# Debug mode for verbose output and bug reports
+./ghostsurf -t https://target.local/ -d
 ```
+
+Dependencies are installed automatically on first run. To force-reinstall: `rm -rf venv && ./ghostsurf -h`
 
 ### CLI Options
 
@@ -66,7 +62,7 @@ Servers:
 
 1. Start ghostsurf:
    ```bash
-   ./run.sh -t https://target.local/ -k -d
+   ./ghostsurf -t https://target.local/ -k -d
    ```
 
 2. Configure browser SOCKS proxy: `127.0.0.1:1080`
