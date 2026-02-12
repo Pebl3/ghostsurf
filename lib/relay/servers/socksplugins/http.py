@@ -18,6 +18,11 @@
 #   senderend - kernel-mode auth workaround, thread-safe socket locking, session picker UI for multi-relay
 #
 import base64
+import select
+import socket
+import ssl
+import urllib.parse
+from http.client import HTTPConnection, HTTPSConnection
 
 from impacket import LOG
 from lib.relay.servers.socksserver import SocksRelay
@@ -58,7 +63,6 @@ class HTTPSocksRelay(SocksRelay):
         if not self.relaySocket or not self.session:
             return False
         try:
-            import select
             # Check if socket is readable or in exceptional state
             # Before we send a request, socket should NOT be readable (no pending data)
             # If readable with 0 timeout = server sent data or closed connection
@@ -105,10 +109,10 @@ class HTTPSocksRelay(SocksRelay):
             response = b'HTTP/1.1 501 Not Implemented\r\nConnection: close\r\n\r\nWebSocket not supported'
             try:
                 self.socksSocket.send(response)
-            except:
+            except Exception:
                 pass
             return False
-            
+
         if '?session=' in request_line:
             # Extract the original path and session parameter
             path_with_params = request_line.split(' ')[1]  # GET /path?session=user HTTP/1.1
@@ -116,7 +120,6 @@ class HTTPSocksRelay(SocksRelay):
             session_param = request_line.split('?session=')[1].split(' ')[0]
 
             # URL decode
-            import urllib.parse
             selected_session = urllib.parse.unquote(session_param).upper()
 
             # Check if this session exists
@@ -343,7 +346,6 @@ class HTTPSocksRelay(SocksRelay):
         if not cookie_header:
             return None
 
-        import urllib.parse
         # Parse cookies (format: "name1=value1; name2=value2")
         for cookie in cookie_header.split(';'):
             cookie = cookie.strip()
@@ -376,7 +378,7 @@ class HTTPSocksRelay(SocksRelay):
                 return ('%s: %s' % (prefix, '; '.join(cookies))).encode('utf-8')
             else:
                 return None  # All cookies were ours, strip the header entirely
-        except:
+        except Exception:
             return cookie_header  # On error, pass through unchanged
 
     def transferResponse(self, initial_data=None):
@@ -408,9 +410,9 @@ class HTTPSocksRelay(SocksRelay):
                         try:
                             resp_headers = data[:headerSize].decode('utf-8', errors='replace')
                             LOG.info('HTTP: Error Response Headers (%s):\n%s' % (status_line.strip(), resp_headers))
-                        except:
+                        except Exception:
                             pass
-            except:
+            except Exception:
                 pass
             # === END DEBUG ===
 
@@ -421,8 +423,6 @@ class HTTPSocksRelay(SocksRelay):
                 return
 
             headers = self.getHeaders(data)
-            content_length = headers.get('content-length', 'none')
-            transfer_encoding = headers.get('transfer-encoding', 'none')
 
             try:
                 bodySize = int(headers.get('content-length', 0))
@@ -467,7 +467,6 @@ class HTTPSocksRelay(SocksRelay):
         Drain remaining response data from relay socket after browser disconnect.
         Prevents leftover data from corrupting subsequent requests on shared socket.
         """
-        import socket
         try:
             # Set short timeout to prevent blocking indefinitely
             original_timeout = self.relaySocket.gettimeout()
@@ -579,7 +578,7 @@ class HTTPSocksRelay(SocksRelay):
             parts = request_line.split(' ')
             if len(parts) >= 2:
                 return parts[1]  # The path is the second element
-        except:
+        except Exception:
             pass
         return None
 
@@ -632,8 +631,6 @@ class HTTPSocksRelay(SocksRelay):
 
         # Try anonymous connection
         try:
-            import ssl
-            from http.client import HTTPSConnection
             uv_context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
             anonConn = HTTPSConnection(relayClient.targetHost, relayClient.targetPort, context=uv_context)
             anonConn.connect()
@@ -684,7 +681,7 @@ class HTTPSocksRelay(SocksRelay):
             LOG.debug('%s: Anon error: %s, falling back to auth' % (protocol, str(e)))
             try:
                 anonConn.close()
-            except:
+            except Exception:
                 pass
             with socketLock:
                 self.relaySocket.send(tosend)
@@ -698,7 +695,7 @@ class HTTPSocksRelay(SocksRelay):
         try:
             req_line = data.split(EOL)[0].decode('utf-8', errors='replace')
             _dbg('>>> REQUEST: %s' % req_line)
-        except: pass
+        except Exception: pass
         # === END DEBUG ===
 
         for part in data.split(EOL):
@@ -790,10 +787,10 @@ class HTTPSocksRelay(SocksRelay):
                         response = b'HTTP/1.1 501 Not Implemented\r\nConnection: close\r\n\r\nWebSocket not supported'
                         try:
                             self.socksSocket.send(response)
-                        except:
+                        except Exception:
                             pass
                         return
-                except:
+                except Exception:
                     # Continue with normal processing if header parsing fails
                     pass
 

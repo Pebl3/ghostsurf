@@ -78,10 +78,10 @@ class HTTPSSocksRelay(SSLServerMixin, HTTPSocksRelay):
                         response = b'HTTP/1.1 501 Not Implemented\r\nConnection: close\r\n\r\nWebSocket not supported'
                         try:
                             self.socksSocket.send(response)
-                        except:
+                        except Exception:
                             pass
                         return
-                except:
+                except Exception:
                     # Continue with normal processing if header parsing fails
                     pass
 

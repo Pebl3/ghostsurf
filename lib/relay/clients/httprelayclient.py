@@ -20,9 +20,9 @@
 import re
 import ssl
 try:
-    from http.client import HTTPConnection, HTTPSConnection, ResponseNotReady
+    from http.client import HTTPConnection, HTTPSConnection
 except ImportError:
-    from httplib import HTTPConnection, HTTPSConnection, ResponseNotReady
+    from httplib import HTTPConnection, HTTPSConnection
 import base64
 from threading import Lock
 

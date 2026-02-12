@@ -170,7 +170,6 @@ class SocksRelay:
         # Charged of tunneling the rest of the connection
         raise RuntimeError('Virtual Function')
 
-    @staticmethod
     def getProtocolPort(self):
         # Should return the port this relay works against
         raise RuntimeError('Virtual Function')
@@ -223,12 +222,12 @@ def activeConnectionsWatcher(server):
         # This call blocks until there is data, so it doesn't loop endlessly
         target, port, scheme, userName, client, data = activeConnections.get()
         # ToDo: Careful. Dicts are not thread safe right?
-        if (target in server.activeRelays) is not True:
+        if target not in server.activeRelays:
             server.activeRelays[target] = {}
-        if (port in server.activeRelays[target]) is not True:
+        if port not in server.activeRelays[target]:
             server.activeRelays[target][port] = {}
 
-        if (userName in server.activeRelays[target][port]) is not True:
+        if userName not in server.activeRelays[target][port]:
             LOG.info('SOCKS: Adding %s@%s(%s) to active SOCKS connection. Enjoy' % (userName, target, port))
             server.activeRelays[target][port][userName] = {}
             # This is the protocolClient. Needed because we need to access the killConnection from time to time.
@@ -261,7 +260,7 @@ def webService(addr, port):
 
         @app.route('/')
         def index():
-            print(server.activeRelays)
+            LOG.debug('Active relays: %s' % server.activeRelays)
             return "Relays available: %s!" % (len(server.activeRelays))
 
         @app.route('/ntlmrelayx/api/v1.0/relays', methods=['GET'])
@@ -275,10 +274,6 @@ def webService(addr, port):
                             isAdmin = server.activeRelays[target][port][user]['isAdmin']
                             relays.append([protocol, target, user, isAdmin, str(port)])
             return jsonify(relays)
-
-        @app.route('/ntlmrelayx/api/v1.0/relays', methods=['GET'])
-        def get_info(relay):
-            pass
 
         app.run(host=addr, port=port)
 
@@ -313,8 +308,8 @@ class SocksRequestHandler(socketserver.BaseRequestHandler):
         if not data:
             LOG.debug("SOCKS: Client closed connection immediately (empty greeting)")
             return
-        grettings = SOCKS5_GREETINGS_BACK(data)
-        self.__socksVersion = grettings['VER']
+        greetings = SOCKS5_GREETINGS_BACK(data)
+        self.__socksVersion = greetings['VER']
 
         if self.__socksVersion == 5:
             # We need to answer back with a no authentication response. We're not dealing with auth for now
@@ -361,7 +356,7 @@ class SocksRequestHandler(socketserver.BaseRequestHandler):
             # Do we have an active connection for the target host/port asked?
             # Still don't know the username, but it's a start
             if self.targetHost in self.__socksServer.activeRelays:
-                if (self.targetPort in self.__socksServer.activeRelays[self.targetHost]) is not True:
+                if self.targetPort not in self.__socksServer.activeRelays[self.targetHost]:
                     LOG.error('SOCKS: Don\'t have a relay for %s(%s)' % (self.targetHost, self.targetPort))
                     self.sendReplyError(replyField.CONNECTION_REFUSED)
                     return
@@ -430,7 +425,7 @@ class SocksRequestHandler(socketserver.BaseRequestHandler):
 
                 self.__connSocket.sendall(reply.getData())
 
-                if relay.skipAuthentication() is not True:
+                if not relay.skipAuthentication():
                     # Something didn't go right
                     # Close the socket
                     self.__connSocket.close()
