@@ -204,16 +204,17 @@ def keepAliveTimer(server):
                         LOG.debug('Calling keepAlive() for %s@%s:%s' % (user, target, port))
                         try:
                             server.activeRelays[target][port][user]['protocolClient'].keepAlive()
+                        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError) as e:
+                            LOG.debug("Exception:",exc_info=True)
+                            LOG.debug('SOCKS: %s' % str(e))
+                            # Connection died, taking out of the active list
+                            del server.activeRelays[target][port][user]
+                            if len(list(server.activeRelays[target][port].keys())) == 1:
+                                del server.activeRelays[target][port]
+                            LOG.debug('Removing active relay for %s@%s:%s' % (user, target, port))
                         except Exception as e:
                             LOG.debug("Exception:",exc_info=True)
                             LOG.debug('SOCKS: %s' % str(e))
-                            if str(e).find('Broken pipe') >= 0 or str(e).find('reset by peer') >=0 or \
-                                            str(e).find('Invalid argument') >= 0 or str(e).find('Server not connected') >=0:
-                                # Connection died, taking out of the active list
-                                del (server.activeRelays[target][port][user])
-                                if len(list(server.activeRelays[target][port].keys())) == 1:
-                                    del (server.activeRelays[target][port])
-                                LOG.debug('Removing active relay for %s@%s:%s' % (user, target, port))
                     else:
                         LOG.debug('Skipping %s@%s:%s since it\'s being used at the moment' % (user, target, port))
 
@@ -335,6 +336,8 @@ class SocksRequestHandler(socketserver.BaseRequestHandler):
                 self.targetPort = unpack('>H',request['PAYLOAD'][hostLength+1:])[0]
             else:
                 LOG.error('No support for IPv6 yet!')
+                self.sendReplyError(replyField.CONNECTION_REFUSED)
+                return
         # SOCKS4
         else:
             self.targetPort = request['PORT']
@@ -345,6 +348,8 @@ class SocksRequestHandler(socketserver.BaseRequestHandler):
 
                 if nullBytePos == -1:
                     LOG.error('Error while reading SOCKS4a header!')
+                    self.sendReplyError(replyField.CONNECTION_REFUSED)
+                    return
                 else:
                     self.targetHost = request['PAYLOAD'].split(b'\0', 1)[1][:-1].decode('utf-8')
             else:
@@ -375,30 +380,36 @@ class SocksRequestHandler(socketserver.BaseRequestHandler):
             except Exception as e:
                 LOG.debug("Exception:", exc_info=True)
                 LOG.error('SOCKS: %s' %str(e))
+                s.close()
                 self.sendReplyError(replyField.CONNECTION_REFUSED)
                 return
 
-            if self.__socksVersion == 5:
-                reply = SOCKS5_REPLY()
-                reply['REP'] = replyField.SUCCEEDED.value
-                addr, port = s.getsockname()
-                reply['PAYLOAD'] = socket.inet_aton(addr) + pack('>H', port)
-            else:
-                reply = SOCKS4_REPLY()
+            try:
+                if self.__socksVersion == 5:
+                    reply = SOCKS5_REPLY()
+                    reply['REP'] = replyField.SUCCEEDED.value
+                    addr, port = s.getsockname()
+                    reply['PAYLOAD'] = socket.inet_aton(addr) + pack('>H', port)
+                else:
+                    reply = SOCKS4_REPLY()
 
-            self.__connSocket.sendall(reply.getData())
+                self.__connSocket.sendall(reply.getData())
 
-            while True:
-                try:
-                    data = self.__connSocket.recv(8192)
-                    if data == b'':
+                while True:
+                    try:
+                        data = self.__connSocket.recv(8192)
+                        if data == b'':
+                            break
+                        s.sendall(data)
+                        data = s.recv(8192)
+                        self.__connSocket.sendall(data)
+                    except Exception as e:
+                        LOG.debug("Exception:", exc_info=True)
+                        LOG.error('SOCKS: %s', str(e))
                         break
-                    s.sendall(data)
-                    data = s.recv(8192)
-                    self.__connSocket.sendall(data)
-                except Exception as e:
-                    LOG.debug("Exception:", exc_info=True)
-                    LOG.error('SOCKS: %s', str(e))
+            finally:
+                s.close()
+            return
 
         # Let's look if there's a relayed connection for our host/port
         scheme = None
@@ -436,19 +447,19 @@ class SocksRequestHandler(socketserver.BaseRequestHandler):
                 self.__socksServer.activeRelays[self.targetHost][self.targetPort][relay.username]['inUse'] = True
 
                 relay.tunnelConnection()
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError) as e:
+                LOG.debug("Exception:", exc_info=True)
+                LOG.debug('SOCKS: %s' % str(e))
+                # Connection died, taking out of the active list
+                del self.__socksServer.activeRelays[self.targetHost][self.targetPort][relay.username]
+                if len(list(self.__socksServer.activeRelays[self.targetHost][self.targetPort].keys())) == 1:
+                    del self.__socksServer.activeRelays[self.targetHost][self.targetPort]
+                LOG.debug('Removing active relay for %s@%s:%s' % (relay.username, self.targetHost, self.targetPort))
+                self.sendReplyError(replyField.CONNECTION_REFUSED)
+                return
             except Exception as e:
                 LOG.debug("Exception:", exc_info=True)
                 LOG.debug('SOCKS: %s' % str(e))
-                if str(e).find('Broken pipe') >= 0 or str(e).find('reset by peer') >=0 or \
-                                str(e).find('Invalid argument') >= 0:
-                    # Connection died, taking out of the active list
-                    del(self.__socksServer.activeRelays[self.targetHost][self.targetPort][relay.username])
-                    if len(list(self.__socksServer.activeRelays[self.targetHost][self.targetPort].keys())) == 1:
-                        del(self.__socksServer.activeRelays[self.targetHost][self.targetPort])
-                    LOG.debug('Removing active relay for %s@%s:%s' % (relay.username, self.targetHost, self.targetPort))
-                    self.sendReplyError(replyField.CONNECTION_REFUSED)
-                    return
-                pass
 
             # Freeing up this connection
             if relay.username is not None:
