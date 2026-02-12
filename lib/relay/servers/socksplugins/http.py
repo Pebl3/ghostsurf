@@ -82,7 +82,7 @@ class HTTPSocksRelay(SocksRelay):
             return False
         except Exception as e:
             LOG.debug('HTTP: isConnectionAlive exception: %s' % str(e))
-            return True  # Assume alive if we can't determine
+            return False  # Assume dead if we can't determine
 
     def skipAuthentication(self):
         # See if the user provided authentication
@@ -276,6 +276,7 @@ class HTTPSocksRelay(SocksRelay):
             return True
         except (ConnectionResetError, BrokenPipeError, OSError) as e:
             LOG.error('HTTP: Failed to send initial request for session %s: %s' % (self.username, str(e)))
+            self._drainRelaySocket()
             return False
     def showSessionSelection(self, available_users):
         """Show HTML page with available session choices that generate Basic Auth headers"""
@@ -375,12 +376,13 @@ class HTTPSocksRelay(SocksRelay):
             cookies = []
             for cookie in cookies_str.split(';'):
                 cookie = cookie.strip()
+                if not cookie:
+                    continue
                 if '=' in cookie:
                     name, _ = cookie.split('=', 1)
                     if name.strip() == HTTPSocksRelay.SESSION_COOKIE:
                         continue  # Skip our session cookie
-                if cookie:
-                    cookies.append(cookie)
+                cookies.append(cookie)
 
             if cookies:
                 return ('%s: %s' % (prefix, '; '.join(cookies))).encode('utf-8')
@@ -475,6 +477,8 @@ class HTTPSocksRelay(SocksRelay):
         Drain remaining response data from relay socket after browser disconnect.
         Prevents leftover data from corrupting subsequent requests on shared socket.
         """
+        if not self.relaySocket:
+            return
         try:
             # Set short timeout to prevent blocking indefinitely
             original_timeout = self.relaySocket.gettimeout()
@@ -658,7 +662,10 @@ class HTTPSocksRelay(SocksRelay):
 
             if not initial_data:
                 LOG.debug('%s: No response from anon connection' % protocol)
-                anonConn.close()
+                try:
+                    anonConn.close()
+                except Exception:
+                    pass
                 with socketLock:
                     self.relaySocket.sendall(tosend)
                     self.transferResponse()
@@ -669,7 +676,10 @@ class HTTPSocksRelay(SocksRelay):
                 # Needs auth - close anon, retry through auth relay
                 LOG.info('%s: Path %s requires auth (cached)' % (protocol, path))
                 authCache[cache_key] = True
-                anonConn.close()
+                try:
+                    anonConn.close()
+                except Exception:
+                    pass
 
                 with socketLock:
                     self.relaySocket.sendall(tosend)
@@ -683,7 +693,10 @@ class HTTPSocksRelay(SocksRelay):
                 self.relaySocket = anonConn.sock
                 self.transferResponse(initial_data=initial_data)
                 self.relaySocket = original_relay
-                anonConn.close()
+                try:
+                    anonConn.close()
+                except Exception:
+                    pass
 
         except Exception as e:
             LOG.debug('%s: Anon error: %s, falling back to auth' % (protocol, str(e)))

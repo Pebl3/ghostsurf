@@ -267,13 +267,16 @@ def webService(addr, port):
         @app.route('/ntlmrelayx/api/v1.0/relays', methods=['GET'])
         def get_relays():
             relays = []
-            for target in server.activeRelays:
-                for port in server.activeRelays[target]:
-                    for user in server.activeRelays[target][port]:
+            for target in list(server.activeRelays.keys()):
+                for port in list(server.activeRelays.get(target, {}).keys()):
+                    for user in list(server.activeRelays.get(target, {}).get(port, {}).keys()):
                         if user != 'data' and user != 'scheme':
-                            protocol = server.activeRelays[target][port]['scheme']
-                            isAdmin = server.activeRelays[target][port][user]['isAdmin']
-                            relays.append([protocol, target, user, isAdmin, str(port)])
+                            try:
+                                protocol = server.activeRelays[target][port]['scheme']
+                                isAdmin = server.activeRelays[target][port][user]['isAdmin']
+                                relays.append([protocol, target, user, isAdmin, str(port)])
+                            except KeyError:
+                                continue
             return jsonify(relays)
 
         app.run(host=addr, port=port)

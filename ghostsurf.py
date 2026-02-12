@@ -69,7 +69,7 @@ class MiniShell(cmd.Cmd):
     def printTable(items, header):
         colLen = []
         for i, col in enumerate(header):
-            rowMaxLen = max([len(row[i]) for row in items])
+            rowMaxLen = max([len(row[i]) for row in items] or [0])
             colLen.append(max(rowMaxLen, len(col)))
         outputFormat = ' '.join(['{%d:%ds} ' % (num, width) for num, width in enumerate(colLen)])
         print(outputFormat.format(*header))
