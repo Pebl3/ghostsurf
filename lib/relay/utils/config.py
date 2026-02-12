@@ -101,4 +101,7 @@ def parse_listening_ports(value):
         if item2 < item1:
             raise ValueError("Upper bound in port range smaller than lower bound")
         ports.update(range(item1, item2 + 1))
+    for port in ports:
+        if port < 1 or port > 65535:
+            raise ValueError("Port %d out of valid range (1-65535)" % port)
     return ports

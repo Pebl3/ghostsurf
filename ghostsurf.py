@@ -12,6 +12,7 @@
 import argparse
 import sys
 import logging
+import signal
 import cmd
 from urllib.request import ProxyHandler, build_opener, Request
 import json
@@ -218,6 +219,15 @@ if __name__ == '__main__':
 
     codec = sys.getdefaultencoding()
 
+    # Validate argument combinations
+    if options.target and options.targets_file:
+        logging.error("Cannot use both -t and -f. Choose one.")
+        sys.exit(1)
+
+    if options.watch and not options.targets_file:
+        logging.error("-w/--watch requires -f/--targets-file")
+        sys.exit(1)
+
     # Set up target
     if options.target is not None:
         logging.info("Target: %s" % options.target)
@@ -246,9 +256,14 @@ if __name__ == '__main__':
     if not options.no_raw_server:
         RELAY_SERVERS.append(RAWRelayServer)
 
+    if not RELAY_SERVERS:
+        logging.error("All capture servers disabled. Enable at least one.")
+        sys.exit(1)
+
     # Watch targets file if requested
     if options.targets_file and options.watch:
         watchthread = TargetsFileWatcher(targetSystem)
+        watchthread.daemon = True
         watchthread.start()
 
     threads = set()
@@ -276,6 +291,11 @@ if __name__ == '__main__':
 
     try:
         shell = MiniShell(c, threads, api_address='{}:{}'.format(options.socks_address, options.api_port))
+
+        def handle_sigterm(signum, frame):
+            raise KeyboardInterrupt
+
+        signal.signal(signal.SIGTERM, handle_sigterm)
         shell.cmdloop()
     except KeyboardInterrupt:
         pass
@@ -284,6 +304,10 @@ if __name__ == '__main__':
     del socksServer
 
     for s in threads:
+        try:
+            s.shutdown()
+        except Exception:
+            pass
         del s
 
     sys.exit(0)

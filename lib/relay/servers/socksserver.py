@@ -132,6 +132,7 @@ class RepeatedTimer(object):
     if not self.is_running:
       self.next_call += self.interval
       self._timer = Timer(self.next_call - time.time(), self._run)
+      self._timer.daemon = True
       self._timer.start()
       self.is_running = True
 
