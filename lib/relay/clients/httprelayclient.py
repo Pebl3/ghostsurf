@@ -124,6 +124,7 @@ class HTTPRelayClient(ProtocolClient):
             self.session.request('GET', self.path, headers=headers)
         res = self.session.getresponse()
         if res.status == 401:
+            res.read()  # Consume response body to keep connection clean
             return None, STATUS_ACCESS_DENIED
         else:
             LOG.info('HTTP server returned error code %d, treating as a successful login' % res.status)

@@ -18,6 +18,7 @@
 #   senderend - kernel-mode auth workaround, thread-safe socket locking, session picker UI for multi-relay
 #
 import base64
+from html import escape as html_escape
 import select
 import socket
 import ssl
@@ -117,6 +118,7 @@ class HTTPSocksRelay(SocksRelay):
             # Extract the original path and session parameter
             path_with_params = request_line.split(' ')[1]  # GET /path?session=user HTTP/1.1
             original_path = path_with_params.split('?')[0]  # /path
+            original_path = original_path.replace('\r', '').replace('\n', '')
             session_param = request_line.split('?session=')[1].split(' ')[0]
 
             # URL decode
@@ -159,8 +161,12 @@ class HTTPSocksRelay(SocksRelay):
             creds = headerDict['authorization']
             if 'Basic' not in creds:
                 raise KeyError()
-            basicAuth = base64.b64decode(creds[6:]).decode("ascii")
-            self.username = basicAuth.split(':')[0].upper()
+            try:
+                basicAuth = base64.b64decode(creds[6:]).decode("ascii")
+                self.username = basicAuth.split(':')[0].upper()
+            except Exception:
+                LOG.warning('HTTP: Invalid Basic auth header')
+                return False
             if '@' in self.username:
                 # Workaround for clients which specify users with the full FQDN
                 # such as ruler
@@ -296,7 +302,7 @@ class HTTPSocksRelay(SocksRelay):
         <h2>🔐 Select Relayed Session</h2>
         <div class="info">Multiple sessions available for <strong>%s:%s</strong><br>
         Click a session to proceed with those credentials:</div>
-""" % (self.targetHost, self.targetPort)
+""" % (html_escape(str(self.targetHost)), html_escape(str(self.targetPort)))
         
         # Add each available session as a form
         for user in available_users:
@@ -309,7 +315,7 @@ class HTTPSocksRelay(SocksRelay):
                 <div class="username">%s</div>
                 <div class="admin %s">Admin privileges: %s</div>
             </div>
-        </form>''' % (user, user, admin_class, admin_status)
+        </form>''' % (html_escape(user), html_escape(user), admin_class, html_escape(str(admin_status)))
         
         html += """
     </div>
@@ -326,6 +332,8 @@ class HTTPSocksRelay(SocksRelay):
         # Get the headers from the request, ignore first "header"
         # since this is the HTTP method, identifier, version
         headerSize = data.find(EOL+EOL)
+        if headerSize == -1:
+            return {}
         headers = data[:headerSize].split(EOL)[1:]
         headerDict = {}
         for header in headers:

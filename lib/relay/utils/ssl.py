@@ -24,6 +24,7 @@
 # Author:
 #   Dirk-jan Mollema (@_dirkjan) / Fox-IT (https://www.fox-it.com)
 #
+import os
 from OpenSSL import crypto, SSL
 from impacket import LOG
 
@@ -49,6 +50,7 @@ def generateImpacketCert(certname='/tmp/impacket.crt'):
     with open(certname, 'w') as certfile:
         certfile.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, pkey).decode('utf-8'))
         certfile.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert).decode('utf-8'))
+    os.chmod(certname, 0o600)
     LOG.debug('Wrote certificate to %s' % certname)
 
 # Class to wrap the client socket in SSL when serving as a SOCKS server
