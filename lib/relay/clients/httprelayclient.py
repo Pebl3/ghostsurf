@@ -153,7 +153,7 @@ class HTTPRelayClient(ProtocolClient):
             # Build raw HTTP HEAD request
             head_request = b'HEAD /favicon.ico HTTP/1.1\r\nHost: ' + self.targetHost.encode() + b'\r\nConnection: Keep-Alive\r\n\r\n'
 
-            self.session.sock.send(head_request)
+            self.session.sock.sendall(head_request)
 
             # Read response with short timeout - don't block forever holding the socket lock
             original_timeout = self.session.sock.gettimeout()

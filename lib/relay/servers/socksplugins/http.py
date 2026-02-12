@@ -108,7 +108,7 @@ class HTTPSocksRelay(SocksRelay):
             LOG.debug('HTTP: WebSocket upgrade request detected - rejecting')
             response = b'HTTP/1.1 501 Not Implemented\r\nConnection: close\r\n\r\nWebSocket not supported'
             try:
-                self.socksSocket.send(response)
+                self.socksSocket.sendall(response)
             except Exception:
                 pass
             return False
@@ -145,7 +145,7 @@ class HTTPSocksRelay(SocksRelay):
                 ).encode()
 
                 try:
-                    self.socksSocket.send(redirect)
+                    self.socksSocket.sendall(redirect)
                 except (ConnectionResetError, BrokenPipeError, OSError) as e:
                     LOG.debug('HTTP: Failed to send session redirect: %s' % str(e))
                 return False  # Close this SOCKS connection; browser follows redirect
@@ -203,7 +203,7 @@ class HTTPSocksRelay(SocksRelay):
                 # No available sessions, return error
                 LOG.error('HTTP: No available sessions for %s(%s)' % (self.targetHost, self.targetPort))
                 reply = [b'HTTP/1.1 503 Service Unavailable',b'Connection: close',b'',b'No relayed sessions available for this target']
-                self.socksSocket.send(EOL.join(reply))
+                self.socksSocket.sendall(EOL.join(reply))
                 return False
             elif len(available_users) == 1:
                 # Only one session, auto-select it
@@ -320,7 +320,7 @@ class HTTPSocksRelay(SocksRelay):
         response_body = html.encode('utf-8')
         response = b'HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %d\r\nConnection: close\r\n\r\n' % len(response_body)
         
-        self.socksSocket.send(response + response_body)
+        self.socksSocket.sendall(response + response_body)
 
     def getHeaders(self, data):
         # Get the headers from the request, ignore first "header"
@@ -419,7 +419,7 @@ class HTTPSocksRelay(SocksRelay):
             headerSize = data.find(EOL+EOL)
             if headerSize == -1:
                 LOG.debug('HTTP: No complete headers found in response')
-                self.socksSocket.send(data)
+                self.socksSocket.sendall(data)
                 return
 
             headers = self.getHeaders(data)
@@ -431,7 +431,7 @@ class HTTPSocksRelay(SocksRelay):
                     expectedTotal = bodySize + headerSize + 4
 
                     # Make sure we send the entire response, but don't keep it in memory
-                    self.socksSocket.send(data)
+                    self.socksSocket.sendall(data)
                     while readSize < expectedTotal:
                         try:
                             data = self.relaySocket.recv(self.packetSize)
@@ -439,7 +439,7 @@ class HTTPSocksRelay(SocksRelay):
                                 LOG.debug('HTTP: Connection closed while reading body (read %d of %d)' % (readSize, expectedTotal))
                                 break
                             readSize += len(data)
-                            self.socksSocket.send(data)
+                            self.socksSocket.sendall(data)
                         except (ConnectionResetError, BrokenPipeError, OSError) as e:
                             LOG.debug('HTTP: Connection error while reading response body: %s' % str(e))
                             break
@@ -451,10 +451,10 @@ class HTTPSocksRelay(SocksRelay):
                         self.transferChunked(data, headers)
                     else:
                         # No body in the response, send as-is
-                        self.socksSocket.send(data)
+                        self.socksSocket.sendall(data)
             except (ValueError, KeyError):
                 # Error parsing content-length or other header issues
-                self.socksSocket.send(data)
+                self.socksSocket.sendall(data)
         except (ConnectionResetError, BrokenPipeError, OSError) as e:
             LOG.debug('HTTP: Socket error in transferResponse: %s' % str(e))
             # Drain relay socket on timeout to prevent garbage in next request
@@ -497,7 +497,7 @@ class HTTPSocksRelay(SocksRelay):
                 LOG.debug('HTTP: Invalid chunked response - no headers')
                 return
             try:
-                self.socksSocket.send(data[:headerSize + 4])
+                self.socksSocket.sendall(data[:headerSize + 4])
             except (ConnectionResetError, BrokenPipeError, OSError) as e:
                 LOG.debug('HTTP: Browser disconnected while sending headers: %s' % str(e))
                 self._drainRelaySocket()
@@ -524,7 +524,7 @@ class HTTPSocksRelay(SocksRelay):
                     bodySize = body.find(EOL) + 2 + datasize + 2
                     readSize = len(body)
                     # Make sure we send the entire response, but don't keep it in memory
-                    self.socksSocket.send(body)
+                    self.socksSocket.sendall(body)
                     while readSize < bodySize:
                         maxReadSize = bodySize - readSize
                         try:
@@ -533,7 +533,7 @@ class HTTPSocksRelay(SocksRelay):
                                 LOG.debug('HTTP: Connection closed during chunked transfer')
                                 return
                             readSize += len(body)
-                            self.socksSocket.send(body)
+                            self.socksSocket.sendall(body)
                         except (ConnectionResetError, BrokenPipeError, OSError) as e:
                             LOG.debug('HTTP: Browser disconnected during chunk send: %s' % str(e))
                             self._drainRelaySocket()
@@ -564,7 +564,7 @@ class HTTPSocksRelay(SocksRelay):
                     
             LOG.debug('Last chunk received - exiting chunked transfer')
             try:
-                self.socksSocket.send(body)
+                self.socksSocket.sendall(body)
             except (ConnectionResetError, BrokenPipeError, OSError) as e:
                 LOG.debug('HTTP: Error sending final chunk: %s' % str(e))
                 
@@ -608,7 +608,7 @@ class HTTPSocksRelay(SocksRelay):
             # Kernel auth mode not enabled, use authenticated relay normally
             with socketLock:
                 tosend = self.prepareRequest(buffer)
-                self.relaySocket.send(tosend)
+                self.relaySocket.sendall(tosend)
                 self.transferResponse()
             return
 
@@ -625,7 +625,7 @@ class HTTPSocksRelay(SocksRelay):
             # Cached as needs auth - use authenticated relay directly
             LOG.debug('%s: Cache HIT (auth) %s' % (protocol, path))
             with socketLock:
-                self.relaySocket.send(tosend)
+                self.relaySocket.sendall(tosend)
                 self.transferResponse()
             return
 
@@ -637,13 +637,13 @@ class HTTPSocksRelay(SocksRelay):
         except Exception as e:
             LOG.error('%s: Anon connection failed: %s, using auth relay' % (protocol, str(e)))
             with socketLock:
-                self.relaySocket.send(tosend)
+                self.relaySocket.sendall(tosend)
                 self.transferResponse()
             return
 
         try:
             # Send request through anonymous connection
-            anonConn.sock.send(tosend)
+            anonConn.sock.sendall(tosend)
 
             # Read initial response to check for 401
             initial_data = anonConn.sock.recv(self.packetSize)
@@ -652,7 +652,7 @@ class HTTPSocksRelay(SocksRelay):
                 LOG.debug('%s: No response from anon connection' % protocol)
                 anonConn.close()
                 with socketLock:
-                    self.relaySocket.send(tosend)
+                    self.relaySocket.sendall(tosend)
                     self.transferResponse()
                 return
 
@@ -664,7 +664,7 @@ class HTTPSocksRelay(SocksRelay):
                 anonConn.close()
 
                 with socketLock:
-                    self.relaySocket.send(tosend)
+                    self.relaySocket.sendall(tosend)
                     self.transferResponse()
             else:
                 # Success - forward response with initial data we already read
@@ -684,7 +684,7 @@ class HTTPSocksRelay(SocksRelay):
             except Exception:
                 pass
             with socketLock:
-                self.relaySocket.send(tosend)
+                self.relaySocket.sendall(tosend)
                 self.transferResponse()
 
     def prepareRequest(self, data):
@@ -786,7 +786,7 @@ class HTTPSocksRelay(SocksRelay):
                         LOG.debug('HTTP: WebSocket upgrade in tunnel - rejecting')
                         response = b'HTTP/1.1 501 Not Implemented\r\nConnection: close\r\n\r\nWebSocket not supported'
                         try:
-                            self.socksSocket.send(response)
+                            self.socksSocket.sendall(response)
                         except Exception:
                             pass
                         return
