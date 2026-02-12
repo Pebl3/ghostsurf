@@ -643,8 +643,11 @@ class HTTPSocksRelay(SocksRelay):
 
         # Try anonymous connection
         try:
-            uv_context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
-            anonConn = HTTPSConnection(relayClient.targetHost, relayClient.targetPort, context=uv_context)
+            if protocol == 'HTTPS':
+                uv_context = ssl.SSLContext()
+                anonConn = HTTPSConnection(relayClient.targetHost, relayClient.targetPort, context=uv_context)
+            else:
+                anonConn = HTTPConnection(relayClient.targetHost, relayClient.targetPort)
             anonConn.connect()
         except Exception as e:
             LOG.error('%s: Anon connection failed: %s, using auth relay' % (protocol, str(e)))

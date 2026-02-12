@@ -236,7 +236,7 @@ class HTTPSRelayClient(HTTPRelayClient):
             self.path = self.target.path
         self.query = self.target.query
         try:
-            uv_context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+            uv_context = ssl.SSLContext()
             self.session = HTTPSConnection(self.targetHost, self.targetPort, timeout=None, context=uv_context)
         except AttributeError:
             self.session = HTTPSConnection(self.targetHost, self.targetPort, timeout=None)
@@ -247,7 +247,7 @@ class HTTPSRelayClient(HTTPRelayClient):
         if self.anonSession is None:
             LOG.debug('HTTPS: Creating anonymous connection to %s:%s' % (self.targetHost, self.targetPort))
             try:
-                uv_context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+                uv_context = ssl.SSLContext()
                 self.anonSession = HTTPSConnection(self.targetHost, self.targetPort, timeout=None, context=uv_context)
             except AttributeError:
                 self.anonSession = HTTPSConnection(self.targetHost, self.targetPort, timeout=None)

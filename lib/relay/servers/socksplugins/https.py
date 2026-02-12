@@ -48,6 +48,10 @@ class HTTPSSocksRelay(SSLServerMixin, HTTPSocksRelay):
         return True
 
     def tunnelConnection(self):
+        # Override parent: identical recv loop but catches SSL.ZeroReturnError
+        # for clean OpenSSL shutdown. Can't merge into parent without importing
+        # OpenSSL into http.py where it's never needed.
+
         # Get the socket lock for this session
         try:
             socketLock = self.activeRelays[self.username]['socketLock']
