@@ -340,13 +340,13 @@ class SocksRequestHandler(socketserver.BaseRequestHandler):
             self.targetPort = request['PORT']
 
             # SOCKS4a
-            if request['ADDR'][:3] == "\x00\x00\x00" and request['ADDR'][3] != "\x00":
-                nullBytePos = request['PAYLOAD'].find("\x00")
+            if request['ADDR'][:3] == b"\x00\x00\x00" and request['ADDR'][3] != 0:
+                nullBytePos = request['PAYLOAD'].find(b"\x00")
 
                 if nullBytePos == -1:
                     LOG.error('Error while reading SOCKS4a header!')
                 else:
-                    self.targetHost = request['PAYLOAD'].split('\0', 1)[1][:-1]
+                    self.targetHost = request['PAYLOAD'].split(b'\0', 1)[1][:-1].decode('utf-8')
             else:
                 self.targetHost = socket.inet_ntoa(request['ADDR'])
 

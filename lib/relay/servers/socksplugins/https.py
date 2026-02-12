@@ -25,7 +25,7 @@ from OpenSSL import SSL
 # Besides using this base class you need to define one global variable when
 # writing a plugin:
 PLUGIN_CLASS = "HTTPSSocksRelay"
-EOL = '\r\n'
+EOL = b'\r\n'
 
 class HTTPSSocksRelay(SSLServerMixin, HTTPSocksRelay):
     PLUGIN_NAME = 'HTTPS Socks Plugin'
