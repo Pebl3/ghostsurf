@@ -38,6 +38,8 @@ def generateImpacketCert(certname='/tmp/impacket.crt'):
 
     # Create the certificate
     cert = crypto.X509()
+    cert.set_version(2)
+    cert.set_serial_number(1000)
     cert.gmtime_adj_notBefore(0)
     # Valid for 5 years
     cert.gmtime_adj_notAfter(60*60*24*365*5)
