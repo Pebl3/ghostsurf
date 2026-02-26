@@ -291,7 +291,7 @@ class HTTPSocksRelay(SocksRelay):
             "\\  \\ ( _)| .-. || | | | _  \\ \\   (_) |  _  \\ \\  | | | ||   (    | .-'\n"
             " \\  `-) )| | |)|\\ `-' /( `-'  )    | | ( `-'  ) | `-')|| |\\ \\   | |\n"
             " )\\____/ /(  (_) )---'  `----'     `-'  `----'  `---(_)|_| \\)\\  )\\|\n"
-            "(__)    (__)    (_)  NTLM relay browser session hijacking  (__)(__)\\n"
+            "(__)    (__)    (_)  NTLM relay browser session hijacking  (__)(__)\n"
         )
 
         html = '<!DOCTYPE html><html><head><title>ghostsurf</title><style>'

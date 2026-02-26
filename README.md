@@ -83,7 +83,9 @@ Servers:
 
 4. Session captured → browse to target through proxy
 
-5. Multiple sessions? Session picker UI appears
+5. Multiple sessions? Session picker UI appears, just click one. The session is bound to
+   the browser's Basic auth cache — to switch to a different session, close
+   and reopen Firefox.
 
 ### Shell Commands
 
