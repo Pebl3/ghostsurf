@@ -281,47 +281,36 @@ class HTTPSocksRelay(SocksRelay):
     def showSessionSelection(self, available_users):
         """Show HTML page with available session choices that generate Basic Auth headers"""
         
-        # Build HTML page with session options
-        html = """<!DOCTYPE html>
-<html>
-<head>
-    <title>ntlmrelayx - Select Session</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f5f5f5; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h2 { color: #333; margin-bottom: 20px; }
-        .session { padding: 15px; margin: 10px 0; border: 2px solid #ddd; border-radius: 5px; cursor: pointer; transition: all 0.3s; }
-        .session:hover { background-color: #f0f8ff; border-color: #4CAF50; }
-        .username { font-weight: bold; font-size: 16px; color: #2c3e50; }
-        .admin { font-size: 14px; color: #666; margin-top: 5px; }
-        .admin.true { color: #e74c3c; font-weight: bold; }
-        .info { color: #666; margin-bottom: 20px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h2>🔐 Select Relayed Session</h2>
-        <div class="info">Multiple sessions available for <strong>%s:%s</strong><br>
-        Click a session to proceed with those credentials:</div>
-""" % (html_escape(str(self.targetHost)), html_escape(str(self.targetPort)))
-        
-        # Add each available session as a form
+        target = html_escape(str(self.targetHost))
+        port = html_escape(str(self.targetPort))
+
+        banner = (
+            "  ,--,   .-. .-. .---.    .---.  _______  .---. .-. .-.,---.    ,---.\n"
+            ".' .'    | | | |/ .-. )  ( .-._)|__   __|( .-._)| | | || .-.\\   | .-'\n"
+            "|  |  __ | `-' || | |(_)(_) \\     )| |  (_) \\   | | | || `-'/   | `-.\n"
+            "\\  \\ ( _)| .-. || | | | _  \\ \\   (_) |  _  \\ \\  | | | ||   (    | .-'\n"
+            " \\  `-) )| | |)|\\ `-' /( `-'  )    | | ( `-'  ) | `-')|| |\\ \\   | |\n"
+            " )\\____/ /(  (_) )---'  `----'     `-'  `----'  `---(_)|_| \\)\\  )\\|\n"
+            "(__)    (__)    (_)  NTLM relay browser session hijacking  (__)(__)\\n"
+        )
+
+        html = '<!DOCTYPE html><html><head><title>ghostsurf</title><style>'
+        html += 'body{background:#1a1a1a;color:#ccc;font-family:monospace;margin:0;padding:40px}'
+        html += 'pre{color:#555;font-size:11px;margin:0 0 20px;line-height:1.2}'
+        html += 'h3{color:#fff;margin:0 0 8px}p{margin:0 0 20px;font-size:13px}'
+        html += 'a{display:block;padding:10px 14px;margin:4px 0;background:#252525;'
+        html += 'color:#7ec;text-decoration:none;border-left:3px solid #555;font-size:14px}'
+        html += 'a:hover{background:#303030;border-color:#7ec}'
+        html += '</style></head><body>'
+        html += '<pre>%s</pre>' % banner
+        html += '<h3>Target: %s:%s</h3>' % (target, port)
+        html += '<p>%d sessions available. Select one:</p>' % len(available_users)
+
         for user in available_users:
-            admin_status = self.activeRelays[user].get('isAdmin', 'N/A')
-            admin_class = 'true' if admin_status == True else 'false'
-            html += '''
-        <form method="GET" action="" style="margin: 0;">
-            <input type="hidden" name="session" value="%s">
-            <div class="session" onclick="this.parentNode.submit()" style="cursor: pointer;">
-                <div class="username">%s</div>
-                <div class="admin %s">Admin privileges: %s</div>
-            </div>
-        </form>''' % (html_escape(user), html_escape(user), admin_class, html_escape(str(admin_status)))
-        
-        html += """
-    </div>
-</body>
-</html>"""
+            safe_user = html_escape(user)
+            html += '<a href="?session=%s">%s</a>' % (safe_user, safe_user)
+
+        html += '</body></html>'
         
         # Send HTTP response with session selection page
         response_body = html.encode('utf-8')
