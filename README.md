@@ -1,6 +1,6 @@
 # ghostsurf
 
-NTLM relay tool with SOCKS proxy for browser session hijacking.
+NTLM HTTP relay tool with SOCKS proxy for browser session hijacking.
 
 Capture NTLM auth, relay to HTTP/HTTPS targets, then browse as the victim through a SOCKS proxy.
 
