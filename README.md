@@ -95,17 +95,31 @@ ghostsurf> targets    # List configured targets
 ghostsurf> exit       # Shutdown
 ```
 
-## Kernel-Mode Auth Workaround
+## Kernel-Mode Auth Workaround (`-k`)
 
-IIS with HTTP.sys binds NTLM auth to TCP connections at kernel level. Sending auth to paths that don't need it resets the session.
+IIS with kernel-mode authentication enabled (the default since IIS 7) binds NTLM auth
+to TCP connections at the kernel level via HTTP.sys. If a request hits a path configured
+for Anonymous authentication (static CSS, JS, images, fonts), HTTP.sys resets the
+authenticated context on the connection. The relay session silently dies with no error.
 
-**Solution**: Probe paths anonymously first:
-1. Fresh connection probes target path
-2. 401 response → use authenticated relay session
-3. 200 response → return anonymous response directly
-4. Results cached per path
+ghostsurf's `-k` flag probes paths anonymously before using the relay socket:
+1. Opens a fresh anonymous connection, sends the same request without NTLM
+2. 401 response → path requires auth → forward through the authenticated relay socket
+3. 200 response → path is public → return anonymous response directly, relay socket untouched
+4. Results cached per path for negligible overhead after initial page load
 
-Enable with `-k` flag.
+Use `-k` for any IIS target. This includes CyberArk, Passwordstate, Delinea Secret Server,
+BeyondTrust Password Safe, SCCM, and other software that preserves default IIS authentication
+settings. If unsure, just use `-k` — the overhead is minimal and it prevents silent session death.
+
+Without `-k`, all requests go directly through the relay socket, which works for targets that
+don't use kernel-mode authentication (Windows Admin Center, Apache, nginx, non-IIS stacks, IIS >= v6).
+
+## Finding Targets
+
+Use [ntlmscan](https://github.com/nyxgeek/ntlmscan/) by [nyxgeek](https://github.com/nyxgeek)
+to discover NTLM-authenticated endpoints in the environment, and reference its
+[path list](https://github.com/nyxgeek/ntlmscan/blob/master/paths.dict) for manual enumeration ideas.
 
 ## Credits
 
