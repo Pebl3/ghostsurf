@@ -2,7 +2,7 @@
 
 NTLM HTTP relay tool with SOCKS proxy for browser session hijacking.
 
-Capture NTLM auth, relay to HTTP/HTTPS targets, then browse as the victim through a SOCKS proxy.
+Capture NTLM auth, relay to HTTP/HTTPS targets, then browse as the victim through a SOCKS proxy. This works even when cookie replay doesn't.
 
 ## Features
 
