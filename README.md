@@ -4,6 +4,8 @@ NTLM HTTP relay tool with SOCKS proxy for browser session hijacking.
 
 Capture NTLM auth, relay to HTTP/HTTPS targets, then browse as the victim through a SOCKS proxy. This works even when cookie replay doesn't.
 
+Blog: [ghostsurf: From NTLM Relay to Browser Session Hijacking](https://specterops.io/blog/2026/04/02/ghostsurf-from-ntlm-relay-to-browser-session-hijacking/)
+
 ## Features
 
 - **Browser Session Hijacking**: SOCKS5 proxy lets you browse as the relayed user
